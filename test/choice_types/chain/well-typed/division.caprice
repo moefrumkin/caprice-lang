@@ -1,0 +1,5 @@
+(* TEST
+    include exhaust;
+*)
+
+let _ = 5 / 0 |> 0
