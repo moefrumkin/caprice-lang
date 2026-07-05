@@ -67,4 +67,6 @@
 %token ABSTRACT
 %token AS
 
+%token JOIN
+
 %%

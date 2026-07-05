@@ -1,0 +1,16 @@
+(* TEST 
+    include exhaust;
+*)
+
+let bool_to_int (b : bool) : int =
+    if b then 1 else 0
+
+let int_to_bool (i : int) : bool = 
+    if i == 0 then false else true
+
+let swap_types x =
+    bool_to_int x |> int_to_bool x
+
+let b : bool = swap_types 1
+
+let i : int = swap_types false

@@ -1,0 +1,5 @@
+(* TEST
+    include exhaust;
+*)
+
+let _: int = 5 |> false

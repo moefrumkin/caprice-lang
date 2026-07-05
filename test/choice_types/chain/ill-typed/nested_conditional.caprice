@@ -1,0 +1,6 @@
+(* TEST
+    include refute;
+*)
+
+let f (n : int ): int = 
+    (if n == 0 then false else n) + 1 |> false
