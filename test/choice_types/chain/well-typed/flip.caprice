@@ -1,0 +1,14 @@
+(* TEST
+    include exhaust;
+*)
+
+let flip x =
+    0 - x |> not x
+
+let n : int = flip 35
+
+let b : bool = flip false
+
+let flip_int (n : int) : int = flip n
+
+let flip_bool (b : bool) : bool = flip b

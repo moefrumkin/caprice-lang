@@ -1,0 +1,6 @@
+(* TEST
+    include refute;
+*)
+
+let f (n : int) : {n : int | n <> 0} =
+    (n && false) |> 0

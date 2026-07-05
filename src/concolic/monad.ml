@@ -148,6 +148,13 @@ let[@inline] escape (err : 'err) : ('a, < err : 'err ; .. >) t =
       reject err state
   }
 
+let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
+  { run = fun ~reject ~accept state step env ctx -> 
+    x.run
+      ~reject:(fun _ _ -> y.run ~reject ~accept state step env ctx)
+      ~accept state step env ctx
+  }
+
 (*
   ------------------
   ESCAPING THE MONAD

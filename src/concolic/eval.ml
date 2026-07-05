@@ -256,68 +256,58 @@ let eval
     Uses environment during evaluation.
   *)
   and eval_binop (left : Ast.t) (op : Binop.t) (right : Ast.t) : (Val.any, Val.Env.t) m =
-    let* vleft = force_eval left in
-    let eval_short_circuit vleft =
-      match vleft with
-      | Any VBool (b, s) when (not b && op = BAnd) || (b && op = BOr) ->
-        (* Cases here are: false AND rhs, true OR rhs *)
-        (* The short-circuiting is effectively a branch, so log the formula *)
-        let* () =
-          push_formula_to_path ~max_step
-            (Smt.Formula.binop Equal s (Smt.Formula.const_bool b))
-        in
-        return vleft
-      | Any VBool (b, s) ->
-        (* Need to evaluate RHS here *)
-        let* () =
-          push_formula_to_path ~max_step
-            (Smt.Formula.binop Equal s (Smt.Formula.const_bool b))
-        in
-        let* vright = force_eval right in
-        begin match vright with
-        | Any VBool _ -> return vright
-        | _ -> mismatch @@ bad_binop vleft op vright
-        end
-      | _ -> mismatch @@ bad_binop vleft op (Any VUnit) (* placeholder because there is no expr printing yet *)
-    in
     match op with
-    | BAnd | BOr -> eval_short_circuit vleft
     | _ ->
-      let* vright = force_eval right in
-      let k f s1 s2 op =
-        return_any @@ f (Smt.Formula.binop op s1 s2)
-      and v_int n s = VInt (n, s)
-      and v_bool n s = VBool (n, s) in
-      match op, vleft, vright with
-      | BPlus       , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 + n2)) e1 e2 Plus
-      | BMinus      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 - n2)) e1 e2 Minus
-      | BTimes      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 * n2)) e1 e2 Times
-      | BEqual      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 = n2)) e1 e2 Equal
-      | BEqual      , Any VBool (b1, e1), Any VBool (b2, e2) -> k (v_bool (b1 = b2)) e1 e2 Equal
-      | BNeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <> n2)) e1 e2 Not_equal
-      | BLessThan   , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 < n2)) e1 e2 Less_than
-      | BLeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <= n2)) e1 e2 Less_than_eq
-      | BGreaterThan, Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 > n2)) e1 e2 Greater_than
-      | BGeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 >= n2)) e1 e2 Greater_than_eq
-      | BDivide, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
-        let* () =
-          push_formula_to_path ~max_step
-            (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0))
-        in
-        k (v_int (n1 / n2)) e1 e2 Divide
-      | BModulus, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
-        let* () =
-          push_formula_to_path ~max_step
-            (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0))
-        in
-        k (v_int (n1 mod n2)) e1 e2 Modulus
-      | BTimes, v1, v2 ->
-        (* Make tuple if v1 and v2 are types. Note that integer muliplication is handled above. *)
-        handle_two v1 v2 (function
-          | `Types (t1, t2) -> return_any @@ VTypeTuple (t1, t2)
+      let* vleft = force_eval left in
+      let eval_short_circuit vleft =
+        match vleft with
+        | Any VBool (b, s) when (not b && op = BAnd) || (b && op = BOr) ->
+          (* Cases here are: false AND rhs, true OR rhs *)
+          (* The short-circuiting is effectively a branch, so log the formula *)
+          let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
+          return vleft
+        | Any VBool (b, s) ->
+          (* Need to evaluate RHS here *)
+          let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
+          let* vright = force_eval right in
+          begin match vright with
+          | Any VBool _ -> return vright
           | _ -> mismatch @@ bad_binop vleft op vright
-        )
-      | _ -> mismatch @@ bad_binop vleft op vright
+          end
+        | _ -> mismatch @@ bad_binop vleft op (Any VUnit) (* placeholder because there is no expr printing yet *)
+      in match op with
+      | BAnd | BOr -> eval_short_circuit vleft
+      | _ ->
+        let* vright = force_eval right in
+        let k f s1 s2 op =
+          return_any @@ f (Smt.Formula.binop op s1 s2)
+        in
+        let v_int n s = VInt (n, s) in
+        let v_bool n s = VBool (n, s) in
+        match op, vleft, vright with
+        | BPlus       , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 + n2)) e1 e2 Plus
+        | BMinus      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 - n2)) e1 e2 Minus
+        | BTimes      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 * n2)) e1 e2 Times
+        | BEqual      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 = n2)) e1 e2 Equal
+        | BEqual      , Any VBool (b1, e1), Any VBool (b2, e2) -> k (v_bool (b1 = b2)) e1 e2 Equal
+        | BNeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <> n2)) e1 e2 Not_equal
+        | BLessThan   , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 < n2)) e1 e2 Less_than
+        | BLeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <= n2)) e1 e2 Less_than_eq
+        | BGreaterThan, Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 > n2)) e1 e2 Greater_than
+        | BGeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 >= n2)) e1 e2 Greater_than_eq
+        | BDivide, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
+          let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
+          k (v_int (n1 / n2)) e1 e2 Divide
+        | BModulus, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
+          let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
+          k (v_int (n1 mod n2)) e1 e2 Modulus
+        | BTimes, v1, v2 ->
+          (* Make tuple if v1 and v2 are types. Note that integer muliplication is handled above. *)
+          handle_two v1 v2 (function
+            | `Types (t1, t2) -> return_any @@ VTypeTuple (t1, t2)
+            | _ -> mismatch @@ bad_binop vleft op vright
+          )
+        | _ -> mismatch @@ bad_binop vleft op vright
 
   (*
     ---------------------
