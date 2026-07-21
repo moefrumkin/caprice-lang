@@ -26,7 +26,7 @@ open Grammar
 *)
 type ('a, 'x) t =
   { run : 'r.
-      reject:('err -> 'state -> 'r) ->
+      reject:('err -> 'state -> Step.t -> 'r) ->
       accept:('a -> 'state -> Step.t -> 'r) ->
       'state -> Step.t -> 'env -> 'ctx -> 'r
   } constraint 'x = < err : 'err ; env : 'env ; state : 'state ; ctx : 'ctx >
@@ -144,14 +144,14 @@ let[@inline] modify (f : 'state -> 'state) : (unit, < state : 'state ; .. >) t =
 *)
 
 let[@inline] escape (err : 'err) : ('a, < err : 'err ; .. >) t =
-  { run = fun ~reject ~accept:_ state _ _ _ ->
-      reject err state
+  { run = fun ~reject ~accept:_ state step _ _ ->
+      reject err state step
   }
 
 let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
   { run = fun ~reject ~accept state step env ctx -> 
     x.run
-      ~reject:(fun _ _ -> y.run ~reject ~accept state step env ctx)
+      ~reject:(fun _ state step -> y.run ~reject ~accept state step env ctx)
       ~accept state step env ctx
   }
 
@@ -165,7 +165,7 @@ let run (x : ('a, < err : 'err ; env : 'env ; state : 'state ; ctx : 'ctx >) t)
   (init_state : 'state) (init_env : 'env) (init_ctx : 'ctx)
   : ('a * Step.t, 'err) result * 'state =
   x.run init_state Step.zero init_env init_ctx
-    ~reject:(fun e state -> Error e, state)
+    ~reject:(fun e state _ -> Error e, state)
     ~accept:(fun a state step -> Ok (a, step), state)
 
 (*
@@ -186,7 +186,7 @@ let[@inline] fork (m : 'a. ('a, < err : 'err ; state : 'state ; .. > as 'x) t)
   { run = fun ~reject ~accept state step env ctx ->
     m.run (setup_state state) step env ctx
       ~accept:Utils.Empty.absurd
-      ~reject:(fun e forked_state ->
+      ~reject:(fun e forked_state _ ->
         (* uses original step count when resuming, not step count after fork *)
         (k e).run ~reject ~accept (restore_state e ~og:state ~forked_state) step env ctx
       )
