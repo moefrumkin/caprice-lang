@@ -36,7 +36,7 @@ let[@inline] incr_step
   { run = fun ~reject ~accept state step _ _ ->
       let step = Step.next step in
       if Step.(step > max_step)
-      then reject (Eval_result.Reach_max_step step) state
+      then reject (Eval_result.Reach_max_step step) state step
       else accept () state step
   }
 
@@ -47,7 +47,7 @@ let[@inline] incr_step
 let[@inline] fetch (id : Ident.t) : (Val.any, Val.Env.t) m =
   { run = fun ~reject ~accept state step env _ ->
       match Env.find id env with
-      | None -> reject (Eval_result.Unbound_variable id) state
+      | None -> reject (Eval_result.Unbound_variable id) state step
       | Some v -> accept v state step
   }
 
@@ -57,7 +57,7 @@ let[@inline] fetch (id : Ident.t) : (Val.any, Val.Env.t) m =
   The ideal implementation would simply be `escape Vanish`.
 *)
 let vanish : 'a 'env. ('a, 'env) m =
-  { run = fun ~reject ~accept:_ state _ _ _ -> reject Vanish state }
+  { run = fun ~reject ~accept:_ state step _ _ -> reject Vanish state step }
 
 let mismatch : 'a 'env. string -> ('a, 'env) m = fun msg ->
   escape (Eval_result.Mismatch msg)
@@ -69,7 +69,7 @@ let assert_inputs_allowed : 'env. (unit, 'env) m =
   { run = fun ~reject ~accept state step _ ctx ->
     match ctx with
     | Allow_inputs -> accept () state step
-    | Disallow_inputs -> reject (Mismatch "Nondeterminism used when not allowed") state
+    | Disallow_inputs -> reject (Mismatch "Nondeterminism used when not allowed") state step
   }
 
 let modify_stem f =
