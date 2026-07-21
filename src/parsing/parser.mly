@@ -20,8 +20,6 @@
 %right PIPE                   /* multiple patterns, variant type separator */
 %left COMMA                   /* tuples */
 
-%left JOIN                    /* |> for the join operation */
-
 %right DOUBLE_PIPE            /* || for boolean or */
 %right DOUBLE_AMPERSAND       /* && for boolean and */
 %right NOT                    /* Not */
@@ -277,8 +275,6 @@ op_expr:
     { EBinop { left ; binop = BOr ; right } }
   | MINUS i=INT
     { EInt (-i) }
-  | left=expr JOIN right=expr
-    { EBinop { left ; binop = BJoin ; right }}
   ;
 
 %inline record_type_or_refinement:

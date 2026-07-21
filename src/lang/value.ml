@@ -103,7 +103,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
       | VGenFun _
       | VGenPoly _
       | VLazy _
-      | VWrapped _) as x -> dat x
+      | VWrapped _ ) as x -> dat x
     | ( VType
       | VTypePoly _
       | VTypeUnit
@@ -378,6 +378,10 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     let splayed_rec_fun (v_func : dval) (v_arg : any) : string =
       Printf.sprintf "Called rec fun %s with symbolic value %s while splaying"
         (to_string v_func) (any_to_string v_arg)
+    
+    let non_callable_type (t : tval) : string =
+        Printf.sprintf "Bad type: %s is not callable"
+          (to_string t)
   end
 
   module Match = struct

@@ -8,9 +8,7 @@
   lsp
   ; external
   cmdliner
-  benchmark
- )
+  benchmark)
  (promote
   (until-clean)
-  (into "../..")
- ))
+  (into "../..")))

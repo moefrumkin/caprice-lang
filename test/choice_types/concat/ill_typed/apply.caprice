@@ -1,0 +1,4 @@
+
+let positive = {n : int | n > 0}
+
+let apply (f : (int -> int) concat (positive -> positive)) (x: positive): positive = f x

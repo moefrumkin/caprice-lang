@@ -56,7 +56,7 @@ let rec is_symbolic : type a. a t -> bool = fun v ->
   | VLazy _
   | VTypeMu _
   | VTypeRefine _
-  | VGenFun { funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } ; table = _ }
+  | VGenFun { funtype = { domain = _ ; codomain = CodDependent _  ; mode = _ } ; table = _ }
   | VTypeFun { domain = _ ; codomain = CodDependent _ ; mode = _ }
   | VWrapped { data = _ ; funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } } ->
     true
@@ -96,6 +96,10 @@ let rec does_wrap_matter : typ t -> bool = function
   | VTypeFun _ (* function wrapper adds usage checks *)
   | VTypeRecord _ (* record and module wrappers can hide labels *)
   | VTypeModule _ -> true
+
+let is_callable : typ t -> bool = function
+  | VTypeFun _ -> true
+  | _ -> false
 
 (**
   [intensional_equal x y] is [Some (b, s)] if [x] and [y] are of the same

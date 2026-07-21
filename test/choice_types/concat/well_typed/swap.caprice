@@ -1,0 +1,9 @@
+(* TEST
+    include exhaust;
+*)
+
+let int_to_bool (n : int) : bool = if n == 0 then false else true
+
+let bool_to_int (b : bool) : int  = if b then 1 else 0
+
+let swap : (int -> bool) concat (bool -> int) = fun x -> int_to_bool x |> bool_to_int x
