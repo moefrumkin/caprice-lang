@@ -47,6 +47,7 @@ let rec is_symbolic : type a. a t -> bool = fun v ->
   | VTypeFun { domain ; codomain = CodValue t ; mode = _ }
   | VGenFun { funtype = { domain ; codomain = CodValue t ; mode = _ } ; table = _ } ->
     is_symbolic domain || is_symbolic t
+  | VTypeConcat typ -> Concattype.any typ ~pred:(fun funtype -> is_symbolic (VTypeFun funtype))
   | VWrapped { data ; funtype = { domain ; codomain = CodValue t ; mode = _ } } ->
     is_symbolic data || is_symbolic domain || is_symbolic t
   (* Closures cases: assume true, but may want to inspect closure *)
@@ -56,9 +57,10 @@ let rec is_symbolic : type a. a t -> bool = fun v ->
   | VLazy _
   | VTypeMu _
   | VTypeRefine _
-  | VGenFun { funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } ; table = _ }
+  | VGenFun { funtype = { domain = _ ; codomain = CodDependent _  ; mode = _ } ; table = _ }
   | VTypeFun { domain = _ ; codomain = CodDependent _ ; mode = _ }
-  | VWrapped { data = _ ; funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } } ->
+  | VWrapped { data = _ ; funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } }
+  | VWrappedConcat { data = _ ; tau = _ } ->
     true
 
 let is_any_symbolic (Any v) = is_symbolic v
@@ -94,8 +96,14 @@ let rec does_wrap_matter : typ t -> bool = function
   (* closures (mu), functions, and records/modules need wrap *)
   | VTypeMu _ (* we overapproximate and assume the recursive type wrap can matter *)
   | VTypeFun _ (* function wrapper adds usage checks *)
+  | VTypeConcat _
   | VTypeRecord _ (* record and module wrappers can hide labels *)
   | VTypeModule _ -> true
+
+let is_callable : typ t -> bool = function
+  | VTypeFun _ -> true
+  | VTypeConcat _ -> true
+  | _ -> false
 
 (**
   [intensional_equal x y] is [Some (b, s)] if [x] and [y] are of the same

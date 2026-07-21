@@ -1,0 +1,9 @@
+(* TEST
+    include exhaust;
+*)
+
+let id_int (n : int) : int = n
+
+let id_bool (b : bool) : bool = b
+
+let id_both: (int -> int) concat (bool -> bool) = fun x -> (id_int x |> id_bool x)

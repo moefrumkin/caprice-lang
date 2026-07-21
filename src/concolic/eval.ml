@@ -231,6 +231,10 @@ let eval
       let* env = read in
       return_any (VTypeFun { domain = dom_t ; mode
         ; codomain = CodDependent (id, { captured = codomain ; env }) })
+    | ETypeConcat (tau_1, tau_2) -> 
+      let* t1 = eval_concattype tau_1 in
+      let* t2 = eval_concattype tau_2 in
+      return_any (VTypeConcat (Concat (t1, t2)))
     | ETypeRefine { var ; tau ; predicate } ->
       let* tval = eval_type tau in
       let* env = read in
@@ -380,6 +384,16 @@ let eval
     handle_any v
       ~dat:(fun d -> mismatch @@ non_type_value d)
       ~typ:return
+  
+  and eval_concattype (expr: Ast.t) : ((Val.tval, Val.fun_cod) Funtype.t Concattype.t, Val.Env.t) m =
+    let* expr = force_eval expr in
+    handle_any expr
+      ~dat:(fun d -> mismatch @@ non_type_value d)
+      ~typ:(function
+        | VTypeFun v -> return (Concattype.Atomic v)
+        | VTypeConcat t -> return t
+        | d -> mismatch @@ non_callable_type d
+      )
 
   (*
     -----------------------------------------------
@@ -576,6 +590,26 @@ let eval
             | _ -> refute
           )
       | _ -> refute
+      end
+    | VTypeConcat t -> 
+      let* v = force_value v in  
+      begin match v with
+        | Any (VFunClosure _ as vfun) ->
+          begin match t with 
+            | Atomic t ->
+              check v (VTypeFun t)
+            | Concat (t1, t2) ->
+              let* b = read_and_log_input KBool ~default:(default_bool ()) in
+              if b then 
+                let* genned = gen_dom t1 in
+                let* res = eval_appl vfun genned in
+                check_cod res t1
+              else
+                let* genned = gen_dom t2 in
+                let* res = eval_appl vfun genned in
+                chain (check_dom genned t1) (check_cod res t2)
+          end
+        | _ -> refute
       end
     | VTypeVariant variant_t ->
       let* v = force_value v in
@@ -780,6 +814,25 @@ let eval
       else
         let* genned = allow_inputs (gen t1) in
         check genned t2
+  
+  and check_dom
+    : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
+    = fun v t ->
+      Concattype.frozen_flatmap t
+        ~f:(fun funtype -> check v funtype.domain)
+        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
+  
+  and check_cod
+    : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
+    = fun v t ->
+      let f: 'a 'env. (Val.tval, Val.fun_cod) Funtype.t -> ('a, 'env) m =
+      fun funtype ->
+        let* cod_tval = (eval_codomain funtype.codomain v) in
+        check v cod_tval
+      in
+      Concattype.frozen_flatmap t
+        ~f
+        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
 
   (*
     -------------------------
@@ -813,6 +866,7 @@ let eval
           return None
       in
       return_any (VGenFun { funtype ; table })
+    | VTypeConcat _ -> failwith "choice generation unimplemented"
     | VType ->
       let* () = assert_inputs_allowed in
       let* Step id = step in (* will use step for a fresh integer *)
@@ -905,6 +959,17 @@ let eval
       return_any (VModule genned_body)
     | VTypeSingle v ->
       return v
+
+  and gen_dom :
+    'env. (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> (Val.any, 'env) m =
+    fun t ->
+    Concattype.frozen_flatmap t ~f:(fun (x : (Val.tval, Val.fun_cod) Funtype.t) -> gen x.domain)
+      ~join:(fun left right -> 
+        (fun _ ->
+        let* b = read_and_log_input KBool ~default:(default_bool ()) in
+        if b then left () else right ()
+        )
+      )
 
   (*
     Generate a list. Makes an actual list instead of a symbol for a lazy one.
@@ -1010,6 +1075,15 @@ let eval
         handle v'
           ~dat:(fun data -> return_any (VWrapped { data ; funtype = tfun }))
           ~typ:(fun _ -> return v)
+      end
+    | VTypeConcat tfun ->
+      begin match v with
+        | Any VWrappedConcat { data ; tau = _} ->
+          return_any (VWrappedConcat { data ; tau = tfun })
+        | Any v' ->
+          handle v'
+            ~dat:(fun data -> return_any (VWrappedConcat { data ; tau = tfun}))
+            ~typ:(fun _ -> return v)
       end
     | VTypeRecord t_body ->
       begin match v with

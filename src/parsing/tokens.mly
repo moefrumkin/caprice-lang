@@ -69,4 +69,6 @@
 
 %token JOIN
 
+%token CONCAT
+
 %%
