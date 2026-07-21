@@ -267,6 +267,17 @@ let local_mode (mode : Funtype.mode) (x : ('a, 'env) m) : ('a, 'env) m =
   | Nondet -> x
   | Det -> disallow_inputs x
 
+let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
+  { run = fun ~reject ~accept state step env ctx -> 
+    x.run
+      ~reject:(fun err state step -> 
+        if Eval_result.does_chain_catch err 
+          then y.run ~reject ~accept state step env ctx
+          else reject err state step
+        )
+      ~accept state step env ctx
+  }
+
 (**
   [run x goal] runs [x] towards the [goal], beginning with empty state and
   environment. Uses the input environment from [goal].

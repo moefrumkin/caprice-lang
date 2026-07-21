@@ -30,3 +30,12 @@ let to_answer = function
 
 (* stop on errors *)
 let is_signal_to_stop res = Answer.is_error @@ to_answer res
+
+let does_chain_catch = function
+  | Refutation _ -> true
+  | Mismatch _ -> true
+  | Unbound_variable _ -> true
+  | Assert_false -> true
+  | Confirmation -> true
+  | Vanish -> false
+  | _ -> false
