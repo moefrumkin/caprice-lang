@@ -1,0 +1,20 @@
+(* TEST
+    include exhaust;
+*)
+
+let true_type = { b : bool | b }
+let false_type = { b : bool | not b }
+
+let is_transitive (rel : int -> int -> bool) : bool =
+    let x = anyvalue in
+    let y = anyvalue in
+    let z = anyvalue in
+    (not ((rel x y) && (rel y z) && (not (rel x z)))) |> true
+
+let lt (m : int) (n : int) : bool =
+    m < n
+
+let neq (m : int) (n : int) : bool =
+    not (m == n)
+
+let _ : true_type = is_transitive lt

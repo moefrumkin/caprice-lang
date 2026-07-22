@@ -13,6 +13,7 @@ type reason =
   | GenInt
   | GenBool
   | GenClosure
+  | GenDomainValue
 
 let reason_to_string = function
   | GenList             -> "Generate list"
@@ -28,6 +29,7 @@ let reason_to_string = function
   | GenInt              -> "Generate Int"
   | GenBool             -> "Generate Bool"
   | GenClosure          -> "Generate Closure"
+  | GenDomainValue      -> "Generate a value in the domain"
 
 type dir =
   | Gen   (* the label is used to generate something *)

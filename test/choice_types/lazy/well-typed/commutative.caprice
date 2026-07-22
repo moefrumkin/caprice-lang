@@ -1,0 +1,16 @@
+(* TEST
+    include exhaust;
+*)
+
+let true_type = { b : bool | b }
+let false_type = { b : bool | not b }
+
+let is_commutative (rel : int -> int -> int) : bool =
+    let x = anyvalue in
+    let y = anyvalue in
+    ((rel x y) == (rel y x)) |> true
+
+let add (x : int) (y : int) : int = x + y
+let sub (x : int) (y : int) : int = x - y
+
+let _ : true_type = is_commutative add

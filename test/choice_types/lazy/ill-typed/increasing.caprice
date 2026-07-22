@@ -1,0 +1,12 @@
+(* TEST
+    include refute;
+*)
+
+let true_type = { b : bool | b }
+
+let is_increasing (f : int -> int) -> bool =
+    let n = anyvalue in
+    ((f n) > n) |> true
+
+let add_n (n : int) : {f : int -> int | is_increasing f} =
+    fun m -> m + n

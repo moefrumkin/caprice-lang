@@ -1,0 +1,8 @@
+(* TEST
+    include exhaust;
+*)
+
+let nonneg = { n : int | n >= 0 }
+
+let extend (f : nonneg -> int) : int -> int =
+    (fun n -> (f n) |> (f (0 - n)))

@@ -978,8 +978,17 @@ let eval
     Concattype.frozen_flatmap t ~f:(fun (x : (Val.tval, Val.fun_cod) Funtype.t) -> gen x.domain)
       ~join:(fun left right -> 
         (fun _ ->
-        let* b = read_and_log_input KBool ~default:(default_bool ()) in
-        if b then left () else right ()
+          let* l = read_and_log_input KTag ~default:(Left GenDomainValue) in
+          match l with
+          | Left GenDomainValue ->
+              let* () = push_tag_to_path (Left GenDomainValue) ~alternatives:([Right GenDomainValue]) in
+              let* () = incr_step ~max_step in
+              left ()
+          | Right GenDomainValue ->
+              let* () = push_tag_to_path (Right GenDomainValue) ~alternatives:([Left GenDomainValue]) in
+              let* () = incr_step ~max_step in
+              right()
+          | _ -> raise bad_input_env
         )
       )
 
