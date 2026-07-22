@@ -247,6 +247,8 @@ primary_expr:
     { $1 }
   | record=primary_expr DOT label=record_label
     { EProject { record ; label } }
+  | ANY_VALUE
+    { EAnyValue }
   ;
 
 op_expr:

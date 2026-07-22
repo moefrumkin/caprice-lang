@@ -1,0 +1,5 @@
+(* TEST
+    include refute;
+*)
+
+let n : int = anyvalue

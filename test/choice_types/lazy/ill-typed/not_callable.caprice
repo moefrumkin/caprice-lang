@@ -1,0 +1,7 @@
+(* TEST
+    include refute;
+*)
+
+let f = anyvalue
+
+let n = f 0

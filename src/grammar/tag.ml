@@ -10,6 +10,9 @@ type reason =
   | CheckLetExpr        (* type check a let-expression, or eval body *)
   | ApplGenFun          (* type check argument, or generate result *)
   | ApplWrappedFun      (* type check argument, or evaluate body *)
+  | GenInt
+  | GenBool
+  | GenClosure
 
 let reason_to_string = function
   | GenList             -> "Generate list"
@@ -22,6 +25,9 @@ let reason_to_string = function
   | CheckLetExpr        -> "Check let-expression"
   | ApplGenFun          -> "Apply generated function"
   | ApplWrappedFun      -> "Apply wrapped function"
+  | GenInt              -> "Generate Int"
+  | GenBool             -> "Generate Bool"
+  | GenClosure          -> "Generate Closure"
 
 type dir =
   | Gen   (* the label is used to generate something *)

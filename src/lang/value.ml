@@ -77,6 +77,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
   and lgen =
     | LGenList of typ t
     | LGenMu of { var : Ident.t ; closure : Ast.t closure }
+    | LAny
 
   and vlazy =
     | LLazy of lgen

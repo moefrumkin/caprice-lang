@@ -71,4 +71,6 @@
 
 %token CONCAT
 
+%token ANY_VALUE
+
 %%

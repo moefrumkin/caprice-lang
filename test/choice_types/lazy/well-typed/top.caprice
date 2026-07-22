@@ -1,0 +1,5 @@
+(* TEST
+    include exhaust;
+*)
+
+let x : top = anyvalue

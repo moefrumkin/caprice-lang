@@ -254,6 +254,17 @@ let eval
         ) (return Variant.Label.Map.empty) ls
       in
       return_any (VTypeVariant variant_bodies)
+    | EAnyValue -> 
+      let* () = incr_step ~max_step in
+      let* cell = new_lazy_cell LAny in
+      return_any (cell)
+      (*gen VTypeTop*)
+      (*let* cell = new_cell (LLazy LAny) in
+      let* () = incr_step ~max_step in
+      return_any (VLazy {
+        cell ;
+        wrapping_types = [VTypeTop]
+    })*)
 
   (*
     ----------------------------------
@@ -679,6 +690,7 @@ let eval
           let* genned = allow_inputs (gen t_body') in
           let* wrapped = wrap_multi wrapping_types genned in
           check wrapped t_body
+        | LLazy LAny -> failwith "check any mu not implemented"
         end
       | _ -> check v t_body
       end
@@ -709,6 +721,7 @@ let eval
           in
           let* wrapped = wrap_multi wrapping_bodies genned in
           check wrapped t_body
+        | LLazy LAny -> failwith "check any in list not implemented"
         end
       | Any VEmptyList -> confirm
       | Any VListCons { hd ; tl } ->
@@ -877,10 +890,9 @@ let eval
       return_any (VGenPoly { id ; nonce })
     | VTypeTop ->
       (* parametric polymorphism is enough here *)
-      let* newtype = gen VType in
-      handle_any newtype
-        ~dat:(fun _ -> raise @@ InvariantException "`type` generated data value")
-        ~typ:gen
+      let* () = assert_inputs_allowed in
+      let* l = new_lazy_cell LAny in
+      return_any l
     | VTypeBottom -> escape Vanish
     | VTypeRecord record_t ->
       let* genned_body =
@@ -1006,6 +1018,29 @@ let eval
     match t_body with
     | VTypeList t -> force_gen_list t
     | _ -> gen t_body (* not mu type because of behavior of unroll_mu *)
+
+  and force_gen_any
+    : 'env. unit -> (Val.any, 'env) m
+    = fun _ ->
+      let* l = read_and_log_input KTag ~default:(Left GenInt) in
+      match l with
+      | Left GenInt ->
+        let* () = push_tag_to_path (Left GenInt) ~alternatives:([(Left GenBool); (Left GenClosure)]) in
+        gen VTypeInt
+      | Left GenBool ->
+        let* () = push_tag_to_path (Left GenBool) ~alternatives:([(Left GenInt); (Left GenClosure)]) in
+        gen VTypeBool
+      | Left GenClosure ->
+        let* () = push_tag_to_path (Left GenClosure) ~alternatives:([(Left GenInt); (Left GenBool)]) in
+        let* () = incr_step ~max_step in
+        return_any (VFunClosure {
+          param = (Ident "x");
+          closure = {
+            captured = EAnyValue;
+            env = Env.empty
+          }
+        } )
+      | _ -> raise bad_input_env
 
   (*
     ----
@@ -1298,6 +1333,7 @@ let eval
           match lv with
           | LGenMu { var ; closure } -> allow_inputs (force_gen_mu var closure)
           | LGenList t -> allow_inputs (force_gen_list t)
+          | LAny -> allow_inputs (force_gen_any ())
         in
         let* () = set_cell cell (LValue genned) in
         return genned

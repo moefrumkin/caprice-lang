@@ -1,0 +1,10 @@
+(* TEST
+    include refute;
+*)
+
+let f (x : top) -> int =
+    (x false) |> 0
+
+let g = anyvalue
+
+let _ : int = f g
