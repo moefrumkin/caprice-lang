@@ -14,6 +14,6 @@ let n : int = id_combined 4
 
 let b : bool = id_combined true
 
-let id_int (n : int) : int = id_combined n
+(*let id_int (n : int) : int = id_combined n
 
-let id_bool (b : bool) : bool = id_combined b
+let id_bool (b : bool) : bool = id_combined b*)

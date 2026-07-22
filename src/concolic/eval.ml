@@ -602,11 +602,15 @@ let eval
           )
       | _ -> refute
       end
-    | VTypeConcat t -> 
+    | VTypeConcat c -> 
       let* v = force_value v in  
       begin match v with
         | Any (VFunClosure _ as vfun) ->
-          begin match t with 
+          let* v = gen_dom c in
+          let* v_codtype = eval_codtype v c in
+          let* v_1 = eval_appl vfun v in
+          check v_1 v_codtype
+          (*begin match t with 
             | Atomic t ->
               check v (VTypeFun t)
             | Concat (t1, t2) ->
@@ -619,7 +623,7 @@ let eval
                 let* genned = gen_dom t2 in
                 let* res = eval_appl vfun genned in
                 chain (check_dom genned t1) (check_cod res t2)
-          end
+          end*)
         | _ -> refute
       end
     | VTypeVariant variant_t ->
@@ -835,7 +839,7 @@ let eval
         ~f:(fun funtype -> check v funtype.domain)
         ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
   
-  and check_cod
+  (*and check_cod
     : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
     = fun v t ->
       let f: 'a 'env. (Val.tval, Val.fun_cod) Funtype.t -> ('a, 'env) m =
@@ -845,7 +849,15 @@ let eval
       in
       Concattype.frozen_flatmap t
         ~f
-        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
+        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))*)
+  
+  and eval_codtype
+      : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t  Concattype.t -> (Val.tval, 'env) m
+    = fun v c ->
+      match c with
+      | Atomic funtype -> eval_codomain funtype.codomain v
+      | Concat (c_1, c_2) ->
+        chain (let* () = check_dom v c_1 in eval_codtype v c_1) (eval_codtype v c_2)
 
   (*
     -------------------------
