@@ -19,6 +19,12 @@ module State = struct
 
   let catch { stem; runs; cells} =
     { stem; runs = List.map Logged_run.catch runs; cells}
+  
+  let without_runs { stem; cells; _ } =
+    { stem; runs = []; cells }
+  
+  let append_runs { stem; runs; cells } additional_runs =
+    { stem; runs = runs @ additional_runs; cells}
 end
 
 (* Context: whether determinism is allowed or not *)
@@ -268,11 +274,12 @@ let local_mode (mode : Funtype.mode) (x : ('a, 'env) m) : ('a, 'env) m =
   | Det -> disallow_inputs x
 
 let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
-  { run = fun ~reject ~accept state step env ctx -> 
+  { run = fun ~reject ~accept (state : State.t) step env ctx -> 
+    let runs = state.runs in
     x.run
       ~reject:(fun err state step -> 
         if Eval_result.does_chain_catch err 
-          then y.run ~reject ~accept (State.catch state) step env ctx
+          then y.run ~reject ~accept (State.append_runs (State.catch state) runs) step env ctx
           else reject err state step
         )
       ~accept state step env ctx
