@@ -1326,13 +1326,10 @@ let eval
   and force_value
     : 'env. Val.any -> (Val.any, 'env) m
     = fun v ->
-    if do_splay then
       match v with
       | Any VLazy vlazy -> resolve_lazy vlazy
       | _ -> return v
-    else
       (* without splaying, nothing is ever delayed because it would be incomplete *)
-      return v
 
   (*
     Forces the value to weak head normal form and wraps with any lazily-done
@@ -1345,7 +1342,6 @@ let eval
   and resolve_lazy
     : 'env. Val.lazy_cell -> (Val.any, 'env) m
     = fun { cell ; wrapping_types } ->
-    assert do_splay;
     let* v_any =
       let* lazy_v = get_cell cell in
       match lazy_v with
