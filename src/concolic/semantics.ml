@@ -16,6 +16,9 @@ module State = struct
     ; runs = []
     ; cells = Utils.Cell.Map.empty
     }
+
+  let catch { stem; runs; cells} =
+    { stem; runs = List.map Logged_run.catch runs; cells}
 end
 
 (* Context: whether determinism is allowed or not *)
@@ -269,7 +272,7 @@ let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
     x.run
       ~reject:(fun err state step -> 
         if Eval_result.does_chain_catch err 
-          then y.run ~reject ~accept state step env ctx
+          then y.run ~reject ~accept (State.catch state) step env ctx
           else reject err state step
         )
       ~accept state step env ctx
