@@ -14,6 +14,7 @@ type reason =
   | GenBool
   | GenClosure
   | GenDomainValue
+  | GenDomainIndx of int
 
 let reason_to_string = function
   | GenList             -> "Generate list"
@@ -30,6 +31,7 @@ let reason_to_string = function
   | GenBool             -> "Generate Bool"
   | GenClosure          -> "Generate Closure"
   | GenDomainValue      -> "Generate a value in the domain"
+  | GenDomainIndx i     -> Printf.sprintf "Generate a value in the domain with index %i" i
 
 type dir =
   | Gen   (* the label is used to generate something *)

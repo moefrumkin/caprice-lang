@@ -255,8 +255,8 @@ let eval
       in
       return_any (VTypeVariant variant_bodies)
     | EAnyValue -> 
-      let* () = incr_step ~max_step in
       let* cell = new_lazy_cell LAny in
+      let* () = incr_step ~max_step in
       return_any (cell)
       (*gen VTypeTop*)
       (*let* cell = new_cell (LLazy LAny) in
@@ -326,7 +326,7 @@ let eval
             | `Types (t1, t2) -> return_any @@ VTypeTuple (t1, t2)
             | _ -> mismatch @@ bad_binop vleft op vright
           )
-        | _ -> mismatch @@ bad_binop vleft op vright
+        | _ -> print_string "mismatch!\n"; mismatch @@ bad_binop vleft op vright
 
   (*
     ---------------------
@@ -604,13 +604,34 @@ let eval
       end
     | VTypeConcat c -> 
       let* v = force_value v in  
+      let c_list = Concattype.to_list c in
       begin match v with
         | Any (VFunClosure _ as vfun) ->
-          let* v = gen_dom c in
-          let* v_codtype = eval_codtype v c in
-          let* v_1 = eval_appl vfun v in
-          check v_1 v_codtype
-          (*begin match t with 
+          let gen_alt_tags n i =
+            let rec gen_alts n i m =
+              begin match m with
+                | 0 -> []
+                | m when m == i -> gen_alts n i (m - 1)
+                | m -> (Tag.Left (GenDomainIndx m)) :: gen_alts n i (m - 1)
+              end
+            in
+            gen_alts n i (n - 1)
+          in
+          let* l = read_and_log_input KTag ~default:(Left (GenDomainIndx 0)) in
+          begin match l with
+            | Left (GenDomainIndx i) -> 
+              let* () = push_tag_to_path (Left (GenDomainIndx i)) ~alternatives:(gen_alt_tags (List.length c_list) i) in
+              let* () = incr_step ~max_step in
+              let gen_funtype = List.nth c_list i in
+              let* dom_val = gen gen_funtype.domain in
+              let check_rest =
+                let* cod = eval_codomain gen_funtype.codomain dom_val in
+                let* result = eval_appl vfun dom_val in
+                check result cod in
+              List.fold_right (fun (funtype: (Val.tval, Val.fun_cod) Funtype.t) acc -> chain acc (check dom_val funtype.domain)) (List.take (i - 1) c_list) check_rest
+            | _ -> raise bad_input_env
+          end
+         (*begin match t with 
             | Atomic t ->
               check v (VTypeFun t)
             | Concat (t1, t2) ->
@@ -832,13 +853,13 @@ let eval
         let* genned = allow_inputs (gen t1) in
         check genned t2
   
-  and check_dom
+  (*and check_dom
     : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
     = fun v t ->
       Concattype.frozen_flatmap t
         ~f:(fun funtype -> check v funtype.domain)
         ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
-  
+      *)
   (*and check_cod
     : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
     = fun v t ->
@@ -850,14 +871,14 @@ let eval
       Concattype.frozen_flatmap t
         ~f
         ~join:(fun left right -> fun _ -> chain (left ()) (right ()))*)
-  
+  (*
   and eval_codtype
       : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t  Concattype.t -> (Val.tval, 'env) m
     = fun v c ->
       match c with
       | Atomic funtype -> eval_codomain funtype.codomain v
       | Concat (c_1, c_2) ->
-        chain (let* () = check_dom v c_1 in eval_codtype v c_1) (eval_codtype v c_2)
+        chain (let* () = check_dom v c_1 in eval_codtype v c_1) (eval_codtype v c_2) *)
 
   (*
     -------------------------
@@ -984,6 +1005,7 @@ let eval
     | VTypeSingle v ->
       return v
 
+  (*
   and gen_dom :
     'env. (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> (Val.any, 'env) m =
     fun t ->
@@ -1003,6 +1025,7 @@ let eval
           | _ -> raise bad_input_env
         )
       )
+  *)
 
   (*
     Generate a list. Makes an actual list instead of a symbol for a lazy one.
