@@ -893,33 +893,6 @@ let eval
         let* genned = allow_inputs (gen t1) in
         check genned t2
   
-  (*and check_dom
-    : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
-    = fun v t ->
-      Concattype.frozen_flatmap t
-        ~f:(fun funtype -> check v funtype.domain)
-        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
-      *)
-  (*and check_cod
-    : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
-    = fun v t ->
-      let f: 'a 'env. (Val.tval, Val.fun_cod) Funtype.t -> ('a, 'env) m =
-      fun funtype ->
-        let* cod_tval = (eval_codomain funtype.codomain v) in
-        check v cod_tval
-      in
-      Concattype.frozen_flatmap t
-        ~f
-        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))*)
-  (*
-  and eval_codtype
-      : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t  Concattype.t -> (Val.tval, 'env) m
-    = fun v c ->
-      match c with
-      | Atomic funtype -> eval_codomain funtype.codomain v
-      | Concat (c_1, c_2) ->
-        chain (let* () = check_dom v c_1 in eval_codtype v c_1) (eval_codtype v c_2) *)
-
   (*
     -------------------------
     GENERATE MEMBER OF A TYPE
@@ -1045,28 +1018,6 @@ let eval
       return_any (VModule genned_body)
     | VTypeSingle v ->
       return v
-
-  (*
-  and gen_dom :
-    'env. (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> (Val.any, 'env) m =
-    fun t ->
-    Concattype.frozen_flatmap t ~f:(fun (x : (Val.tval, Val.fun_cod) Funtype.t) -> gen x.domain)
-      ~join:(fun left right -> 
-        (fun _ ->
-          let* l = read_and_log_input KTag ~default:(Left GenDomainValue) in
-          match l with
-          | Left GenDomainValue ->
-              let* () = push_tag_to_path (Left GenDomainValue) ~alternatives:([Right GenDomainValue]) in
-              let* () = incr_step ~max_step in
-              left ()
-          | Right GenDomainValue ->
-              let* () = push_tag_to_path (Right GenDomainValue) ~alternatives:([Left GenDomainValue]) in
-              let* () = incr_step ~max_step in
-              right()
-          | _ -> raise bad_input_env
-        )
-      )
-  *)
 
   (*
     Generate a list. Makes an actual list instead of a symbol for a lazy one.
