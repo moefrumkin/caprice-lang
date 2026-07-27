@@ -25,3 +25,6 @@ let argv_step_conv =
       | None -> Error "Expected integer step"
       )
     ~pp:(fun formatter (Step i) -> Format.pp_print_int formatter i)
+
+let to_int = function
+  | Step n -> n

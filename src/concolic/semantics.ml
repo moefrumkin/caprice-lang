@@ -30,9 +30,13 @@ end
 (* Context: whether determinism is allowed or not *)
 type det_ctx = Allow_inputs | Disallow_inputs
 
+type fork_ctx = Allow_fork | Disallow_fork
+
+type ctx = { det_ctx : det_ctx ; fork_ctx : fork_ctx }
+
 include Monad
 
-type ('a, 'env) m = ('a, < err : Eval_result.t ; env : 'env ; state : State.t ; ctx : det_ctx >) t
+type ('a, 'env) m = ('a, < err : Eval_result.t ; env : 'env ; state : State.t ; ctx : ctx >) t
 
 module Matches = Val.Make_match (struct
   type nonrec 'a m = ('a, Val.Env.t) m
@@ -76,9 +80,14 @@ let mismatch : 'a 'env. string -> ('a, 'env) m = fun msg ->
 *)
 let assert_inputs_allowed : 'env. (unit, 'env) m =
   { run = fun ~reject ~accept state step _ ctx ->
-    match ctx with
+    match ctx.det_ctx with
     | Allow_inputs -> accept () state step
     | Disallow_inputs -> reject (Mismatch "Nondeterminism used when not allowed") state step
+  }
+
+let read_ctx : 'env. (ctx, 'env) m = 
+  { run = fun ~reject:_ ~accept state step _ ctx ->
+    accept ctx state step
   }
 
 let modify_stem f =
@@ -257,14 +266,16 @@ let new_lazy_cell : 'env. Val.lgen -> (Val.dval, 'env) m = fun lgen ->
     is a failure.
 *)
 let[@inline] disallow_inputs (x : ('a, 'env) m) : ('a, 'env) m =
-  local_ctx' Disallow_inputs x
+  let* ctx = read_ctx in
+  local_ctx' {ctx with det_ctx = Disallow_inputs} x
 
 (**
   [allow_inputs x] runs [x] such that any [assert_inputs_allowed]
     is NOT a failure.
 *)
 let[@inline] allow_inputs (x : ('a, 'env) m) : ('a, 'env) m =
-  local_ctx' Allow_inputs x
+  let* ctx = read_ctx in
+  local_ctx' {ctx with det_ctx = Allow_inputs} x
 
 (**
   [local_mode mode x] runs [x] in the context based on
@@ -277,6 +288,13 @@ let local_mode (mode : Funtype.mode) (x : ('a, 'env) m) : ('a, 'env) m =
   | Nondet -> x
   | Det -> disallow_inputs x
 
+let is_fork_allowed : 'env. unit -> (bool, 'env) m =
+  fun _ -> 
+  let* ctx = read_ctx in
+  match ctx.fork_ctx with
+  | Allow_fork -> return true
+  | Disallow_fork -> return false
+
 let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
   { run = fun ~reject ~accept (state : State.t) step env ctx -> 
     let runs = state.runs in
@@ -286,7 +304,7 @@ let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
           then y.run ~reject ~accept (State.append_runs (State.catch state) runs) step env ctx
           else reject err state step
         )
-      ~accept state step env ctx
+      ~accept state step env { ctx with fork_ctx = Disallow_fork }
   }
 
 (**
@@ -295,6 +313,6 @@ let chain (x : ('a, 'x) t) (y : ('a, 'x) t) : ('a, 'x) t =
 *)
 let run (x : ('a, Val.Env.t) m) (goal : Goal.t) : Eval_result.t * State.t =
   let state = State.make goal in
-  match run x state Env.empty Allow_inputs with
+  match run x state Env.empty { det_ctx = Allow_inputs; fork_ctx = Allow_fork} with
   | Ok _, state -> Done, state
   | Error e, state -> e, state

@@ -39,7 +39,8 @@ let eval
   *)
   let fork_on_left (type a env) ~(left : 'a. ('a, env) m) ~(right : (a, env) m) ~reason =
     let* () = incr_step ~max_step in
-    if do_fork then
+    let* fork_allowed = is_fork_allowed () in
+    if do_fork && fork_allowed then
       let run_left =
         let* () = push_and_log_tag @@ Left reason in
         left
@@ -123,6 +124,7 @@ let eval
             let* tval = eval_codomain funtype.codomain v_arg in
             wrap v_res tval
           )
+      | Any (VWrappedConcat _) -> failwith "applying wrapped concat funs is not implemented"
       | _ -> mismatch @@ apply_non_function v_func
       end
     | EMatch { subject ; patterns } ->
@@ -356,7 +358,7 @@ let eval
             | `Types (t1, t2) -> return_any @@ VTypeTuple (t1, t2)
             | _ -> mismatch @@ bad_binop vleft op vright
           )
-        | _ -> print_string "mismatch!\n"; mismatch @@ bad_binop vleft op vright
+        | _ -> mismatch @@ bad_binop vleft op vright
 
   (*
     ---------------------
@@ -634,6 +636,7 @@ let eval
       end
     | VTypeConcat c -> 
       let* v = force_value v in  
+      let* () = incr_step ~max_step in
       let c_list = Concattype.to_list c in
       begin match v with
         | Any (VFunClosure _ as vfun) ->
@@ -641,7 +644,7 @@ let eval
             let rec gen_alts n i m =
               begin match m with
                 | 0 -> []
-                | m when m == i -> gen_alts n i (m - 1)
+                | m when m = i -> gen_alts n i (m - 1)
                 | m -> (Tag.Left (GenDomainIndx m)) :: gen_alts n i (m - 1)
               end
             in
@@ -661,20 +664,6 @@ let eval
               List.fold_right (fun (funtype: (Val.tval, Val.fun_cod) Funtype.t) acc -> chain acc (check dom_val funtype.domain)) (List.take (i - 1) c_list) check_rest
             | _ -> raise bad_input_env
           end
-         (*begin match t with 
-            | Atomic t ->
-              check v (VTypeFun t)
-            | Concat (t1, t2) ->
-              let* b = read_and_log_input KBool ~default:(default_bool ()) in
-              if b then 
-                let* genned = gen_dom t1 in
-                let* res = eval_appl vfun genned in
-                check_cod res t1
-              else
-                let* genned = gen_dom t2 in
-                let* res = eval_appl vfun genned in
-                chain (check_dom genned t1) (check_cod res t2)
-          end*)
         | _ -> refute
       end
     | VTypeVariant variant_t ->
