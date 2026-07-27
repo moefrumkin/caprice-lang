@@ -28,6 +28,7 @@ let eval
   ~(default_bool : unit -> bool)
   ~(do_splay : bool)
   ~(do_wrap : bool)
+  ~(do_fork : bool)
   : Logged_run.t list
   =
   (*
@@ -38,20 +39,35 @@ let eval
   *)
   let fork_on_left (type a env) ~(left : 'a. ('a, env) m) ~(right : (a, env) m) ~reason =
     let* () = incr_step ~max_step in
-    let run_left =
-      let* () = push_and_log_tag @@ Left reason in
-      left
-    in
-    let run_right =
-      let* () = push_and_log_tag @@ Right reason in
-      right
-    in
-    let* l_opt = allow_inputs (read_input KTag) in
-    match l_opt with
-    | Some Left reason' when reason = reason' -> run_left
-    | Some Right reason' when reason = reason' -> run_right
-    | Some _ -> raise bad_input_env
-    | None -> let* () = fork run_left in run_right
+    if do_fork then
+      let run_left =
+        let* () = push_and_log_tag @@ Left reason in
+        left
+      in
+      let run_right =
+        let* () = push_and_log_tag @@ Right reason in
+        right
+      in
+      let* l_opt = allow_inputs (read_input KTag) in
+      match l_opt with
+      | Some Left reason' when reason = reason' -> run_left
+      | Some Right reason' when reason = reason' -> run_right
+      | Some _ -> raise bad_input_env
+      | None -> let* () = fork run_left in run_right
+    else
+      let run_left =
+        let* () = push_tag_to_path (Left reason) ~alternatives:[Right reason] in
+        left
+      in
+      let run_right =
+        let* () = push_tag_to_path (Right reason) ~alternatives:[Left reason] in
+        right
+      in
+      let* lbl = allow_inputs (read_and_log_input KTag ~default:(Left reason)) in
+      match lbl with
+      | Left reason' when reason = reason' -> run_left
+      | Right reason' when reason = reason' -> run_right
+      | _ -> raise bad_input_env
   in
 
   (*
@@ -182,7 +198,9 @@ let eval
       begin match v with
       | Any VBool (b, s) ->
         let cont = if b then then_ else else_ in
-        let* () = push_formula_to_path (if b then s else Smt.Formula.not_ s) in
+        let* () =
+          push_formula_to_path ~max_step (if b then s else Smt.Formula.not_ s)
+        in
         eval cont
       | _ -> mismatch @@ if_non_bool v
       end
@@ -191,10 +209,10 @@ let eval
       begin match v with
       | Any VBool (b, s) ->
         if b then
-          let* () = push_formula_to_path s in
+          let* () = push_formula_to_path ~max_step s in
           return_any VUnit
         else
-          let* () = push_formula_to_path (Smt.Formula.not_ s) in
+          let* () = push_formula_to_path ~max_step (Smt.Formula.not_ s) in
           escape Assert_false
       | _ -> mismatch @@ assert_non_bool v
       end
@@ -203,10 +221,10 @@ let eval
       begin match v with
       | Any VBool (b, s) ->
         if b then
-          let* () = push_formula_to_path ~allow_flip:false s in
+          let* () = push_formula_to_path ~max_step ~allow_flip:false s in
           return_any VUnit
         else
-          let* () = push_formula_to_path (Smt.Formula.not_ s) in
+          let* () = push_formula_to_path ~max_step (Smt.Formula.not_ s) in
           escape Vanish
       | _ -> mismatch @@ assume_non_bool v
       end
@@ -283,11 +301,17 @@ let eval
         | Any VBool (b, s) when (not b && op = BAnd) || (b && op = BOr) ->
           (* Cases here are: false AND rhs, true OR rhs *)
           (* The short-circuiting is effectively a branch, so log the formula *)
-          let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
+          let* () =
+          push_formula_to_path ~max_step
+            (Smt.Formula.binop Equal s (Smt.Formula.const_bool b))
+        in
           return vleft
         | Any VBool (b, s) ->
           (* Need to evaluate RHS here *)
-          let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
+          let* () =
+          push_formula_to_path ~max_step
+            (Smt.Formula.binop Equal s (Smt.Formula.const_bool b))
+        in
           let* vright = force_eval right in
           begin match vright with
           | Any VBool _ -> return vright
@@ -315,10 +339,16 @@ let eval
         | BGreaterThan, Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 > n2)) e1 e2 Greater_than
         | BGeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 >= n2)) e1 e2 Greater_than_eq
         | BDivide, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
-          let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
+          let* () =
+          push_formula_to_path ~max_step
+            (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0))
+        in
           k (v_int (n1 / n2)) e1 e2 Divide
         | BModulus, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
-          let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
+          let* () =
+          push_formula_to_path ~max_step
+            (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0))
+        in
           k (v_int (n1 mod n2)) e1 e2 Modulus
         | BTimes, v1, v2 ->
           (* Make tuple if v1 and v2 are types. Note that integer muliplication is handled above. *)
@@ -374,10 +404,10 @@ let eval
         | (input, output) :: tl ->
           let (b, s) = intensional_equal input v_arg in
           if b then
-            let* () = push_formula_to_path s in
+            let* () = push_formula_to_path ~max_step s in
             return output
           else
-            let* () = push_formula_to_path (Formula.not_ s) in
+            let* () = push_formula_to_path ~max_step (Formula.not_ s) in
             find_output tl
       in
       find_output mappings
@@ -764,10 +794,12 @@ let eval
           match p with
           | Any VBool (b, s) ->
             if b then
-              let* () = push_formula_to_path s in
+              let* () = push_formula_to_path ~max_step s in
               confirm
             else
-              let* () = push_formula_to_path ~allow_flip:false (Smt.Formula.not_ s) in
+              let* () =
+                push_formula_to_path ~max_step ~allow_flip:false (Smt.Formula.not_ s)
+              in
               refute
           | _ -> mismatch @@ non_bool_predicate p
         )
@@ -793,10 +825,12 @@ let eval
           (* For non-type equality, use intensional equality *)
           let (b, s) = Val.intensional_equal v_single v in
           if b then
-            let* () = push_formula_to_path s in
+            let* () = push_formula_to_path ~max_step s in
             confirm
           else
-            let* () = push_formula_to_path ~allow_flip:false (Formula.not_ s) in
+            let* () =
+              push_formula_to_path ~max_step ~allow_flip:false (Formula.not_ s)
+            in
             refute
       )
 
@@ -812,24 +846,41 @@ let eval
       if Record.Label.Set.subset t_labels v_labels then
         (* incr step because about to read an input *)
         let* () = incr_step ~max_step in
-        let* l_opt = allow_inputs (read_input KTag) in
-        let push_and_check label =
-          let* () = push_and_log_tag (Grammar.Tag.of_record_label label) in
-          check_label label
-        in
-        match l_opt with
-        | Some Label (id, Check) -> push_and_check (Record.Label.RecordLabel id)
-        | Some _ -> raise bad_input_env
-        | None ->
-          (* is in exploration mode, so we want to check every label *)
-          let rec go enum =
-            match Record.Label.Set.Enum.head_opt enum with
-            | Some label ->
-              let* () = fork (push_and_check label) in
-              go (Record.Label.Set.Enum.tail enum)
-            | None -> escape Eval_result.Confirmation
+        if do_fork then
+          let* l_opt = allow_inputs (read_input KTag) in
+          let push_and_check label =
+            let* () = push_and_log_tag (Grammar.Tag.of_record_label label) in
+            check_label label
           in
-          go (Record.Label.Set.Enum.enum t_labels)
+          match l_opt with
+          | Some Label (id, Check) -> push_and_check (Record.Label.RecordLabel id)
+          | Some _ -> raise bad_input_env
+          | None ->
+            (* is in exploration mode, so we want to check every label *)
+            let rec go enum =
+              match Record.Label.Set.Enum.head_opt enum with
+              | Some label ->
+                let* () = fork (push_and_check label) in
+                go (Record.Label.Set.Enum.tail enum)
+              | None -> escape Eval_result.Confirmation
+            in
+            go (Record.Label.Set.Enum.enum t_labels)
+        else
+          let* default =
+            match Record.Label.Set.choose_opt t_labels with
+            | None -> escape Confirmation
+            | Some l -> return (Grammar.Tag.of_record_label l)
+          in
+          let* lbl = allow_inputs (read_and_log_input KTag ~default) in
+          match lbl with
+          | Label (id, Check) ->
+            let alternatives =
+              Record.Label.Set.remove (RecordLabel id) t_labels
+              |> Record.Label.Set.list_map Grammar.Tag.of_record_label
+            in
+            let* () = push_tag_to_path lbl ~alternatives in
+            check_label (RecordLabel id)
+          | _ -> raise bad_input_env
       else
         refute
 
@@ -964,12 +1015,13 @@ let eval
       let* v = gen tau in
       let* p = local' (Env.set var v env) (eval captured) in
       begin match p with
-      | Any VBool (true, s) ->
-        let* () = push_formula_to_path ~allow_flip:false s in
-        return v
-      | Any VBool (false, s) ->
-        let* () = push_formula_to_path (Smt.Formula.not_ s) in
-        escape Vanish
+      | Any VBool (b, s) ->
+        if b then
+          let* () = push_formula_to_path ~max_step ~allow_flip:false s in
+          return v
+        else
+          let* () = push_formula_to_path ~max_step (Smt.Formula.not_ s) in
+          escape Vanish
       | _ -> mismatch @@ non_bool_predicate p
       end
     | VTypeMu { var ; closure } ->
@@ -1035,11 +1087,11 @@ let eval
   and force_gen_list
     : 'env. Val.tval -> (Val.any, 'env) m
     = fun body ->
+    let* () = incr_step ~max_step in
     let* l = read_and_log_input KTag ~default:(Left GenList) in
     match l with
     | Left GenList ->
       let* () = push_tag_to_path (Left GenList) ~alternatives:[ Right GenList ] in
-      let* () = incr_step ~max_step in (* doesn't call gen, so need to increment step manually *)
       return_any VEmptyList
     | Right GenList ->
       let* () = push_tag_to_path (Right GenList) ~alternatives:[ Left GenList ] in
