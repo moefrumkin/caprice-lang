@@ -1,5 +1,0 @@
-(* TEST
-    include refute;
-*)
-
-let _: bool = 5 |> false

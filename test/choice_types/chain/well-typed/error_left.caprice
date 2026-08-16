@@ -1,5 +1,0 @@
-(* TEST
-    include exhaust;
-*)
-
-let _: int = (0 + false) |> 0

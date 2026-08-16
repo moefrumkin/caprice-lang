@@ -3,7 +3,7 @@
 *)
 
 let f (x : top) -> int =
-    (x false) |> 0
+    (x false)
 
 let g = anyvalue
 

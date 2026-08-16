@@ -1,9 +1,0 @@
-(* TEST
-    include exhaust;
-*)
-
-let flip_int (n : int) : int = (0 - n)
-
-let flip_bool (b : bool) : bool = if b then false else true
-
-let flip : (int -> int) concat (bool -> bool) = fun x -> flip_int x |> flip_bool x

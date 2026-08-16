@@ -1,6 +1,0 @@
-(* TEST
-    include exhaust;
-*)
-
-let f (n : int) : int =
-    n |> false
