@@ -89,8 +89,6 @@ rule token = parse
 | "rec"                { REC }
 | "abstract"           { ABSTRACT }
 | "as"                 { AS }
-| "|>"                 { JOIN }
-| "concat"             { CONCAT }
 | "anyvalue"           { ANY_VALUE }
 | digit+ as n          { INT (int_of_string n) }
 | ident_start ident_cont* as s     { IDENTIFIER s }

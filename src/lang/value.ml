@@ -34,7 +34,6 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VLazy : lazy_cell -> dat t (* lazily evaluated thing, so state must manage this *)
     (* wrapped values *)
     | VWrapped : { data : dat t ; funtype : (typ t, fun_cod) Funtype.t } -> dat t
-    | VWrappedConcat : { data : dat t ; tau : (typ t, fun_cod) Funtype.t Concattype.t} -> dat t
     (* type values only *)
     | VType : typ t
     | VTypePoly : { id : int } -> typ t
@@ -46,7 +45,6 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VTypeMu : { var : Ident.t ; closure : Ast.t closure } -> typ t
     | VTypeList : typ t -> typ t
     | VTypeFun : (typ t, fun_cod) Funtype.t -> typ t
-    | VTypeConcat : (typ t, fun_cod) Funtype.t Concattype.t -> typ t
     | VTypeRecord : typ t Record.t -> typ t
     | VTypeModule : (Record.Label.t * Ast.t) list closure -> typ t
     | VTypeVariant : typ t Variant.Label.Map.t -> typ t
@@ -106,8 +104,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
       | VGenFun _
       | VGenPoly _
       | VLazy _
-      | VWrapped _
-      | VWrappedConcat _) as x -> dat x
+      | VWrapped _) as x -> dat x
     | ( VType
       | VTypePoly _
       | VTypeUnit
@@ -118,7 +115,6 @@ module Make (Atom_cell : Utils.Types.P1) = struct
       | VTypeMu _
       | VTypeList _
       | VTypeFun _
-      | VTypeConcat _
       | VTypeRecord _
       | VTypeModule _
       | VTypeVariant _
@@ -187,14 +183,10 @@ module Make (Atom_cell : Utils.Types.P1) = struct
       contains_mu v
     | VWrapped { data ; funtype } ->
       contains_mu data || contains_mu (VTypeFun funtype)
-    | VWrappedConcat { data ; tau } ->
-      contains_mu data || Concattype.any tau ~pred:(fun x -> contains_mu (VTypeFun x))
     | VTypeFun { domain ; codomain = CodValue t ; mode = _ }
     | VGenFun { funtype = { domain ; codomain = CodValue t ; mode = _ } ; table = _ } ->
       contains_mu domain || contains_mu t
     (* Closures cases: assume true, but may want to inspect closure *)
-    | VTypeConcat typ ->
-      Concattype.any typ ~pred:(fun typ -> contains_mu (VTypeFun typ))
     | VFunClosure _
     | VFunFix _
     | VTypeModule _
@@ -256,8 +248,6 @@ module Make (Atom_cell : Utils.Types.P1) = struct
       Printf.sprintf "G(poly id : %d, nonce : %d)" id nonce
     | VWrapped { data ; funtype } ->
       Printf.sprintf "W(%s, %s)" (to_string data) (to_string (VTypeFun funtype))
-    | VWrappedConcat { data ; tau } ->
-      Printf.sprintf "WC(%s, %s)" (to_string data) (to_string (VTypeConcat tau))
     | VLazy { cell = _ ; wrapping_types } ->
       List.fold_right (fun t acc ->
         Printf.sprintf "W(%s, %s)" acc (to_string t)
@@ -289,8 +279,6 @@ module Make (Atom_cell : Utils.Types.P1) = struct
         Printf.sprintf "(%s : %s) %s <codomain>"
           (Ident.to_string id) (to_string domain) (Funtype.mode_to_string mode)
       end
-    | VTypeConcat typ ->
-      Concattype.flatmap typ ~f:(fun funtype -> to_string (VTypeFun funtype)) ~join:(fun a b -> Printf.sprintf "%s concat %s" a b)
     | VTypeRecord map_body ->
       if Record.Label.Map.is_empty map_body then "{:}" else
       let decls =

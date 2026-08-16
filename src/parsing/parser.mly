@@ -20,8 +20,6 @@
 %right PIPE                   /* multiple patterns, variant type separator */
 %left COMMA                   /* tuples */
 
-%left JOIN                    /* |> for the join operation */
-
 %right DOUBLE_PIPE            /* || for boolean or */
 %right DOUBLE_AMPERSAND       /* && for boolean and */
 %right NOT                    /* Not */
@@ -30,7 +28,6 @@
 %right DOUBLE_COLON           /* :: */
 %right prec_variant_pattern   /* variant destruction pattern */
 %left PLUS MINUS              /* + - */
-%right CONCAT
 %right ARROW WAVY_ARROW       /* -> and ~> for type declaration */
 %left ASTERISK SLASH PERCENT  /* * / % */
 
@@ -171,10 +168,6 @@ expr:
     { List.fold_right (fun type_id acc ->
       ETypeFun { domain = Some type_id, EType ; codomain = acc ; mode }
       ) type_ids codomain }
-  | fst=expr CONCAT snd=expr
-    {
-      ETypeConcat (fst, snd)
-    }
   ;
 
 variant_type_body:
@@ -284,8 +277,6 @@ op_expr:
     { EBinop { left ; binop = BOr ; right } }
   | MINUS i=INT
     { EInt (-i) }
-  | left=expr JOIN right=expr
-    { EBinop { left ; binop = BJoin ; right }}
   ;
 
 %inline record_type_or_refinement:

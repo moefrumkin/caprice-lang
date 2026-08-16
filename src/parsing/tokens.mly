@@ -67,10 +67,6 @@
 %token ABSTRACT
 %token AS
 
-%token JOIN
-
-%token CONCAT
-
 %token ANY_VALUE
 
 %%

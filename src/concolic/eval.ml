@@ -231,10 +231,6 @@ let eval
       let* env = read in
       return_any (VTypeFun { domain = dom_t ; mode
         ; codomain = CodDependent (id, { captured = codomain ; env }) })
-    | ETypeConcat (tau_1, tau_2) -> 
-      let* t1 = eval_concattype tau_1 in
-      let* t2 = eval_concattype tau_2 in
-      return_any (VTypeConcat (Concat (t1, t2)))
     | ETypeRefine { var ; tau ; predicate } ->
       let* tval = eval_type tau in
       let* env = read in
@@ -274,59 +270,56 @@ let eval
     Uses environment during evaluation.
   *)
   and eval_binop (left : Ast.t) (op : Binop.t) (right : Ast.t) : (Val.any, Val.Env.t) m =
-    match op with
-    | BJoin -> chain (force_eval left) (force_eval right)
-    | _ ->
-      let* vleft = force_eval left in
-      let eval_short_circuit vleft =
-        match vleft with
-        | Any VBool (b, s) when (not b && op = BAnd) || (b && op = BOr) ->
-          (* Cases here are: false AND rhs, true OR rhs *)
-          (* The short-circuiting is effectively a branch, so log the formula *)
-          let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
-          return vleft
-        | Any VBool (b, s) ->
-          (* Need to evaluate RHS here *)
-          let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
-          let* vright = force_eval right in
-          begin match vright with
-          | Any VBool _ -> return vright
-          | _ -> mismatch @@ bad_binop vleft op vright
-          end
-        | _ -> mismatch @@ bad_binop vleft op (Any VUnit) (* placeholder because there is no expr printing yet *)
-      in match op with
-      | BAnd | BOr -> eval_short_circuit vleft
-      | _ ->
+    let* vleft = force_eval left in
+    let eval_short_circuit vleft =
+      match vleft with
+      | Any VBool (b, s) when (not b && op = BAnd) || (b && op = BOr) ->
+        (* Cases here are: false AND rhs, true OR rhs *)
+        (* The short-circuiting is effectively a branch, so log the formula *)
+        let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
+        return vleft
+      | Any VBool (b, s) ->
+        (* Need to evaluate RHS here *)
+        let* () = push_formula_to_path (Smt.Formula.binop Equal s (Smt.Formula.const_bool b)) in
         let* vright = force_eval right in
-        let k f s1 s2 op =
-          return_any @@ f (Smt.Formula.binop op s1 s2)
-        in
-        let v_int n s = VInt (n, s) in
-        let v_bool n s = VBool (n, s) in
-        match op, vleft, vright with
-        | BPlus       , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 + n2)) e1 e2 Plus
-        | BMinus      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 - n2)) e1 e2 Minus
-        | BTimes      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 * n2)) e1 e2 Times
-        | BEqual      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 = n2)) e1 e2 Equal
-        | BEqual      , Any VBool (b1, e1), Any VBool (b2, e2) -> k (v_bool (b1 = b2)) e1 e2 Equal
-        | BNeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <> n2)) e1 e2 Not_equal
-        | BLessThan   , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 < n2)) e1 e2 Less_than
-        | BLeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <= n2)) e1 e2 Less_than_eq
-        | BGreaterThan, Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 > n2)) e1 e2 Greater_than
-        | BGeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 >= n2)) e1 e2 Greater_than_eq
-        | BDivide, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
-          let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
-          k (v_int (n1 / n2)) e1 e2 Divide
-        | BModulus, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
-          let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
-          k (v_int (n1 mod n2)) e1 e2 Modulus
-        | BTimes, v1, v2 ->
-          (* Make tuple if v1 and v2 are types. Note that integer muliplication is handled above. *)
-          handle_two v1 v2 (function
-            | `Types (t1, t2) -> return_any @@ VTypeTuple (t1, t2)
-            | _ -> mismatch @@ bad_binop vleft op vright
-          )
+        begin match vright with
+        | Any VBool _ -> return vright
         | _ -> mismatch @@ bad_binop vleft op vright
+        end
+      | _ -> mismatch @@ bad_binop vleft op (Any VUnit) (* placeholder because there is no expr printing yet *)
+    in match op with
+    | BAnd | BOr -> eval_short_circuit vleft
+    | _ ->
+      let* vright = force_eval right in
+      let k f s1 s2 op =
+        return_any @@ f (Smt.Formula.binop op s1 s2)
+      in
+      let v_int n s = VInt (n, s) in
+      let v_bool n s = VBool (n, s) in
+      match op, vleft, vright with
+      | BPlus       , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 + n2)) e1 e2 Plus
+      | BMinus      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 - n2)) e1 e2 Minus
+      | BTimes      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_int (n1 * n2)) e1 e2 Times
+      | BEqual      , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 = n2)) e1 e2 Equal
+      | BEqual      , Any VBool (b1, e1), Any VBool (b2, e2) -> k (v_bool (b1 = b2)) e1 e2 Equal
+      | BNeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <> n2)) e1 e2 Not_equal
+      | BLessThan   , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 < n2)) e1 e2 Less_than
+      | BLeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 <= n2)) e1 e2 Less_than_eq
+      | BGreaterThan, Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 > n2)) e1 e2 Greater_than
+      | BGeq        , Any VInt (n1, e1) , Any VInt (n2, e2)  -> k (v_bool (n1 >= n2)) e1 e2 Greater_than_eq
+      | BDivide, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
+        let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
+        k (v_int (n1 / n2)) e1 e2 Divide
+      | BModulus, Any VInt (n1, e1), Any VInt (n2, e2) when n2 <> 0 ->
+        let* () = push_formula_to_path (Smt.Formula.binop Not_equal e2 (Smt.Formula.const_int 0)) in
+        k (v_int (n1 mod n2)) e1 e2 Modulus
+      | BTimes, v1, v2 ->
+        (* Make tuple if v1 and v2 are types. Note that integer muliplication is handled above. *)
+        handle_two v1 v2 (function
+          | `Types (t1, t2) -> return_any @@ VTypeTuple (t1, t2)
+          | _ -> mismatch @@ bad_binop vleft op vright
+        )
+      | _ -> mismatch @@ bad_binop vleft op vright
 
   (*
     ---------------------
@@ -396,17 +389,7 @@ let eval
       ~dat:(fun d -> mismatch @@ non_type_value d)
       ~typ:return
   
-  and eval_concattype (expr: Ast.t) : ((Val.tval, Val.fun_cod) Funtype.t Concattype.t, Val.Env.t) m =
-    let* expr = force_eval expr in
-    handle_any expr
-      ~dat:(fun d -> mismatch @@ non_type_value d)
-      ~typ:(function
-        | VTypeFun v -> return (Concattype.Atomic v)
-        | VTypeConcat t -> return t
-        | d -> mismatch @@ non_callable_type d
-      )
-
-  (*
+   (*
     -----------------------------------------------
     EVALUATE RECURSIVE TYPE TO A NON-REC TYPE VALUE
     -----------------------------------------------
@@ -601,26 +584,6 @@ let eval
             | _ -> refute
           )
       | _ -> refute
-      end
-    | VTypeConcat t -> 
-      let* v = force_value v in  
-      begin match v with
-        | Any (VFunClosure _ as vfun) ->
-          begin match t with 
-            | Atomic t ->
-              check v (VTypeFun t)
-            | Concat (t1, t2) ->
-              let* b = read_and_log_input KBool ~default:(default_bool ()) in
-              if b then 
-                let* genned = gen_dom t1 in
-                let* res = eval_appl vfun genned in
-                check_cod res t1
-              else
-                let* genned = gen_dom t2 in
-                let* res = eval_appl vfun genned in
-                chain (check_dom genned t1) (check_cod res t2)
-          end
-        | _ -> refute
       end
     | VTypeVariant variant_t ->
       let* v = force_value v in
@@ -828,25 +791,6 @@ let eval
         let* genned = allow_inputs (gen t1) in
         check genned t2
   
-  and check_dom
-    : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
-    = fun v t ->
-      Concattype.frozen_flatmap t
-        ~f:(fun funtype -> check v funtype.domain)
-        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
-  
-  and check_cod
-    : 'a 'env. Val.any -> (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> ('a, 'env) m
-    = fun v t ->
-      let f: 'a 'env. (Val.tval, Val.fun_cod) Funtype.t -> ('a, 'env) m =
-      fun funtype ->
-        let* cod_tval = (eval_codomain funtype.codomain v) in
-        check v cod_tval
-      in
-      Concattype.frozen_flatmap t
-        ~f
-        ~join:(fun left right -> fun _ -> chain (left ()) (right ()))
-
   (*
     -------------------------
     GENERATE MEMBER OF A TYPE
@@ -879,7 +823,6 @@ let eval
           return None
       in
       return_any (VGenFun { funtype ; table })
-    | VTypeConcat _ -> failwith "choice generation unimplemented"
     | VType ->
       let* () = assert_inputs_allowed in
       let* Step id = step in (* will use step for a fresh integer *)
@@ -971,17 +914,6 @@ let eval
       return_any (VModule genned_body)
     | VTypeSingle v ->
       return v
-
-  and gen_dom :
-    'env. (Val.tval, Val.fun_cod) Funtype.t Concattype.t -> (Val.any, 'env) m =
-    fun t ->
-    Concattype.frozen_flatmap t ~f:(fun (x : (Val.tval, Val.fun_cod) Funtype.t) -> gen x.domain)
-      ~join:(fun left right -> 
-        (fun _ ->
-        let* b = read_and_log_input KBool ~default:(default_bool ()) in
-        if b then left () else right ()
-        )
-      )
 
   (*
     Generate a list. Makes an actual list instead of a symbol for a lazy one.
@@ -1110,15 +1042,6 @@ let eval
         handle v'
           ~dat:(fun data -> return_any (VWrapped { data ; funtype = tfun }))
           ~typ:(fun _ -> return v)
-      end
-    | VTypeConcat tfun ->
-      begin match v with
-        | Any VWrappedConcat { data ; tau = _} ->
-          return_any (VWrappedConcat { data ; tau = tfun })
-        | Any v' ->
-          handle v'
-            ~dat:(fun data -> return_any (VWrappedConcat { data ; tau = tfun}))
-            ~typ:(fun _ -> return v)
       end
     | VTypeRecord t_body ->
       begin match v with

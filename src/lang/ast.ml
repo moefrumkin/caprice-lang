@@ -32,7 +32,6 @@ type t =
   | ETypeRecord of t Record.t
   | ETypeModule of (Record.Label.t * t) list
   | ETypeFun of (Ident.t option * t, t) Funtype.t
-  | ETypeConcat of t * t
   | ETypeRefine of (t, t) Refinement.t
   | ETypeMu of { var : Ident.t ; body : t }
   | ETypeList of t
