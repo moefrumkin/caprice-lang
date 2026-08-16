@@ -1,5 +1,0 @@
-(* TEST
-    include refute;
-*)
-
-let g : (bool -> bool) concat (int -> int) = fun x -> (0 - x)

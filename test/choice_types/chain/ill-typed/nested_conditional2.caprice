@@ -1,8 +1,0 @@
-(* TEST
-    include refute;
-*)
-
-let f n = 
-    (if n == 17 then false else n) * 2 |> false
-
-let g (n : int) : int = 2 * (f n)

@@ -1,9 +1,0 @@
-let nonneg = { n : int | n >= 0 }
-
-let apply (f : nonneg -> int) : int = 
-    f (0 )
-
-
-let test_apply (f : int -> int): int =
-    let f: nonneg -> int = f
-    in apply f 
