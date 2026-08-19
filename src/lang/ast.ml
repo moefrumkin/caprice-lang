@@ -5,6 +5,7 @@ type t =
   | EBool of bool
   | EVar of Ident.t
   | EBinop of { left : t ; binop : Binop.t ; right : t }
+  | EOnion of { left : t ; right : t } 
   | EIf of { if_ : t ; then_ : t ; else_ : t }
   | ELet of { stmt : statement ; body : t }
   | EAppl of { func : t ; arg : t }

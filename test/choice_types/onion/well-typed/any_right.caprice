@@ -1,0 +1,9 @@
+(* TEST
+    include exhaust;
+*)
+
+let person = { age : int; living : bool }
+
+let the_king : person = { age = 77; living = true}
+
+let _ : person = the_king & anyvalue

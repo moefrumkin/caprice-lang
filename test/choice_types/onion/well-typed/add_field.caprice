@@ -1,0 +1,8 @@
+(* TEST
+    include exhaust;
+*)
+
+let twoD = { x : int ; y : int }
+let threeD = { x : int ; y : int ; z : int }
+
+let twoD_to_threeD (pt : twoD) : threeD = {z = 0} & pt
