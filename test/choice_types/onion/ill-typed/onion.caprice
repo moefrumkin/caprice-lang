@@ -1,0 +1,12 @@
+(* TEST
+    include refute;
+*)
+
+let person = { age : int ; ssn : int }
+let properties = { age : bool }
+
+let mr_burns : person = { age = 104; ssn = 2 }
+
+let to_show : properties = { age = false }
+
+let roosevelt : person = to_show & { ssn = 1 }

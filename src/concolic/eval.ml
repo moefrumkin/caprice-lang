@@ -122,16 +122,8 @@ let eval
       in
       find_match patterns
     | EProject { record ; label } ->
-      let* v = force_eval record in
-      begin match v with
-      | Any VRecord map_body
-      | Any VModule map_body ->
-        begin match Record.Label.Map.find_opt label map_body with
-        | Some v' -> return v'
-        | None -> mismatch @@ missing_label v label
-        end
-      | _ -> mismatch @@ project_non_record v label
-      end
+      let* v = eval record in
+      eval_project v label
     | EVariant { label ; payload } ->
       let* v = eval payload in
       return_any (VVariant { label ; payload = v })
@@ -175,6 +167,10 @@ let eval
       end
     | EBinop { left ; binop ; right } ->
       eval_binop left binop right
+    | EOnion { left ; right } ->
+      let* left = eval left in
+      let* right = eval right in
+      return_any (VOnion { left ; right })
     | EIf { if_ ; then_ ; else_ } ->
       let* v = force_eval if_ in
       begin match v with
@@ -444,6 +440,37 @@ let eval
     | CodDependent (id, { captured ; env }) ->
       local' (Env.set id dom_witness env) (eval_type captured)
 
+  and eval_project
+    : 'env. Val.any -> Record.Label.t -> (Val.any, 'env) m
+    = fun v label -> 
+    match v with
+    | Any VRecord map_body
+    | Any VModule map_body ->
+      begin match Record.Label.Map.find_opt label map_body with
+      | Some v' -> return v'
+      | None -> mismatch @@ missing_label v label
+      end
+    | Any (VOnion {left ; right}) ->
+      chain (eval_project left label) (eval_project right label)
+    | Any (VLazy ({ cell; _ } as typed_cell)) ->
+      let* lazy_v = get_cell cell in
+      begin match lazy_v with
+      | LValue v -> eval_project v label
+      | LLazy LAny ->
+        let* () = incr_step ~max_step in
+        let* field_cell = new_lazy_cell LAny in
+        let* () = incr_step ~max_step in
+        let* onion_cell = new_lazy_cell LAny in
+        let record = VRecord ( Record.Label.Map.of_list [(label, to_any field_cell)]) in
+        let onioned_record = VOnion { left=to_any record; right=to_any onion_cell} |> to_any in
+        let* () = set_cell cell (LValue onioned_record) in
+        return_any field_cell
+      | LLazy _ ->
+        let* v = resolve_lazy typed_cell in
+        eval_project v label
+      end
+    | _ -> mismatch @@ project_non_record v label
+
   (*
     -------------------------
     CHECK FOR TYPE REFUTATION
@@ -599,14 +626,22 @@ let eval
       let* v = force_value v in
       begin match v with
       | Any VRecord record_v ->
-        let t_labels = Record.label_set record_t
-        and v_labels = Record.label_set record_v in
-        let check_label label =
-          check
-            (Record.Label.Map.find label record_v)
-            (Record.Label.Map.find label record_t)
-        in
-        check_struct check_label ~refute ~t_labels ~v_labels
+        let t_labels = Record.label_set record_t in
+        let v_labels = Record.label_set record_v in
+          let check_label label =
+            check
+              (Record.Label.Map.find label record_v)
+              (Record.Label.Map.find label record_t)
+          in
+          check_struct check_label ~refute ~t_labels ~v_labels
+      | Any (VOnion _) -> 
+        let t_labels = Record.label_set record_t in
+        let v_labels = (Val.labels v) in
+          let check_label label =
+            let* field = (eval_project v label) in
+            check field (Record.Label.Map.find label record_t)
+          in
+          check_struct check_label ~refute ~t_labels ~v_labels
       | _ -> refute
       end
     | VTypeModule { captured ; env } ->
@@ -844,7 +879,9 @@ let eval
       let* genned_body =
         Record.Label.Map.mapM (module Semantics) gen record_t
       in
-      return_any (VRecord genned_body)
+      let* () = assert_inputs_allowed in
+      let* l = new_lazy_cell (LAny) in
+      return_any (VOnion { left=Any (VRecord genned_body) ; right = Any l })
     | VTypeVariant variant_t ->
       let t_labels = Variant.Label.B.domain variant_t in
       let* l =
@@ -1248,9 +1285,9 @@ let eval
   and resolve_lazy
     : 'env. Val.lazy_cell -> (Val.any, 'env) m
     = fun { cell ; wrapping_types } ->
-    assert do_splay;
-    let* lazy_v = get_cell cell in
+    (* assert do_splay; *)
     let* v_any =
+      let* lazy_v = get_cell cell in
       match lazy_v with
       | LLazy lv ->
         let* genned =

@@ -1,0 +1,9 @@
+(* TEST
+    include refute;
+*)
+
+let twoD = { x : int ; y : int }
+let threeD = { x : int ; y : int ; z : int }
+
+(* pt may already have a field z *)
+let twoD_to_threeD (pt : twoD) : threeD = pt & {z = 0}

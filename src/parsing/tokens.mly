@@ -67,6 +67,8 @@
 %token ABSTRACT
 %token AS
 
+%token ONION
+
 %token ANY_VALUE
 
 %%

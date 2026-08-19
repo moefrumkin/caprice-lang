@@ -1,0 +1,8 @@
+let twoD = { x : int ; y : int }
+let threeD = { x : int ; y : int ; z : int }
+
+let a : twoD = {x = 1; y = 2}
+
+let b : threeD = a & {z = 0}
+
+let c : threeD = {z = 0} & a

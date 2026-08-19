@@ -47,6 +47,8 @@ let rec is_symbolic : type a. a t -> bool = fun v ->
   | VTypeFun { domain ; codomain = CodValue t ; mode = _ }
   | VGenFun { funtype = { domain ; codomain = CodValue t ; mode = _ } ; table = _ } ->
     is_symbolic domain || is_symbolic t
+  | VOnion { left=Any left ; right=Any right } ->
+    is_symbolic left || is_symbolic right
   | VWrapped { data ; funtype = { domain ; codomain = CodValue t ; mode = _ } } ->
     is_symbolic data || is_symbolic domain || is_symbolic t
   (* Closures cases: assume true, but may want to inspect closure *)
@@ -511,3 +513,9 @@ let equal_fun_cod cod1 cod2 =
 
 let equal_closure c1 c2 =
   let (b, _) = iequal_closure [] c1 c2 in b
+
+let rec labels (x : any): Record.Label.Set.t =
+  match x with 
+  | Any (VRecord record_body) -> (Record.label_set record_body)
+  | Any (VOnion { left ; right }) -> Record.Label.Set.union (labels left) (labels right)
+  | _ -> Record.Label.Set.empty

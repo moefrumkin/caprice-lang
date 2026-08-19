@@ -20,6 +20,7 @@
 %right PIPE                   /* multiple patterns, variant type separator */
 %left COMMA                   /* tuples */
 
+%right ONION
 %right DOUBLE_PIPE            /* || for boolean or */
 %right DOUBLE_AMPERSAND       /* && for boolean and */
 %right NOT                    /* Not */
@@ -275,6 +276,8 @@ op_expr:
     { EBinop { left ; binop = BAnd ; right } }
   | left=expr DOUBLE_PIPE right=expr
     { EBinop { left ; binop = BOr ; right } }
+  | left=expr ONION right=expr
+    { EOnion { left; right }}
   | MINUS i=INT
     { EInt (-i) }
   ;
