@@ -386,8 +386,8 @@ let eval
     handle_any v
       ~dat:(fun d -> mismatch @@ non_type_value d)
       ~typ:return
-
-  (*
+  
+   (*
     -----------------------------------------------
     EVALUATE RECURSIVE TYPE TO A NON-REC TYPE VALUE
     -----------------------------------------------
