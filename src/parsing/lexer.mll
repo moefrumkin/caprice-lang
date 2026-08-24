@@ -91,6 +91,7 @@ rule token = parse
 | "as"                 { AS }
 | "anyvalue"           { ANY_VALUE }
 | "&"                  { ONION }
+| "append"             { APPEND }
 | digit+ as n          { INT (int_of_string n) }
 | ident_start ident_cont* as s     { IDENTIFIER s }
 | ""                   { failwith "Lexer - unexpected empty buffer" }

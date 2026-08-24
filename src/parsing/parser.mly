@@ -15,6 +15,7 @@
 %nonassoc prec_let prec_fun   /* Let-ins and functions */
 %nonassoc prec_if             /* Conditionals */
 %nonassoc prec_mu             /* mu types */
+%right APPEND
 %nonassoc OF                  /* variant type declarations */
 %nonassoc AS                  /* pattern as ident */
 %right PIPE                   /* multiple patterns, variant type separator */
@@ -156,6 +157,8 @@ expr:
     { ETypeMu { var ; body } }
   | function_type
     { $1 }
+  | type_a=expr APPEND type_b=expr
+    { ETypeAppend (type_a, type_b) }
   ;
 
 %inline function_type:

@@ -38,6 +38,7 @@ type t =
   | ETypeList of t
   | ETypeVariant of t Variant.t list
   | ETypeSingle of t
+  | ETypeAppend of t * t
   | EAnyValue
 
 and annot =

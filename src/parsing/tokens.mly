@@ -71,4 +71,6 @@
 
 %token ANY_VALUE
 
+%token APPEND
+
 %%
