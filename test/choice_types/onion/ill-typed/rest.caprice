@@ -1,0 +1,11 @@
+(* TEST
+    include refute;
+*)
+
+let two_d = {x : int; y : int}
+let three_d = {x : int; y : int; z : int}
+
+let origin : three_d = { x = 0 ; y = 0 ; z = 0}
+
+let apply_to_origin (f : two_d -> two_d) : three_d = 
+    f origin
