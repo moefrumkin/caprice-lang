@@ -804,7 +804,12 @@ let eval
           ~right:(check v2 t2)
       | _ -> refute
       end
-    | VTypeAppend _ -> failwith "append check not implemented"
+    | VTypeAppend types ->
+      begin match v with
+        | Any (VOnion items) -> 
+          check_append items types
+        | _ -> refute
+      end
     | VTypeSingle v_single ->
       let* v = force_value v in
       handle_two v_single v (function
@@ -879,6 +884,17 @@ let eval
       else
         let* genned = allow_inputs (gen t1) in
         check genned t2
+  
+  and check_append
+    : 'a 'env. any list -> any list -> ('a, 'env) m
+    = fun items types ->
+      match items, types with
+      | item::item_rest, type_::type_rest ->
+        Val.handle_any ~typ:(fun type_ ->
+        let* _ = check item type_
+        in check_append item_rest type_rest
+        ) ~dat:(fun _ -> escape (Refutation (Any (VOnion items), (VTypeAppend types)))) type_
+      | _ -> escape (Refutation (Any (VOnion items), (VTypeAppend types)))
   
   (*
     -------------------------
@@ -1001,7 +1017,16 @@ let eval
         )
       in
       return_any (VModule genned_body)
-    | VTypeAppend _ -> failwith "append gen not implemented"
+    | VTypeAppend types -> 
+      let* items = List.fold_left (fun acc x -> 
+          Monad.bind acc (fun acc -> 
+              Val.handle_any ~typ:(fun t -> 
+                let* x = gen t in
+                return (acc @ [x])
+              ) ~dat:(fun _ -> failwith "") x
+            )
+        ) (return []) types in 
+      return_any (VOnion items)
     | VTypeSingle v ->
       return v
 

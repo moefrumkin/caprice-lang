@@ -1,0 +1,4 @@
+let two_d = {x : int; y : int}
+
+let swap (type t) (pt : two_d append t) : two_d append t =
+    {x = pt.y ; y = pt.x} & pt
