@@ -52,7 +52,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VTypeRefine : (typ t, Ast.t closure) Refinement.t -> typ t
     | VTypeTuple : typ t * typ t -> typ t
     | VTypeSingle : any -> typ t
-    | VTypeAppend : typ t list -> typ t
+    | VTypeAppend : any list -> typ t
 
   and 'a closure = { captured : 'a ; env : env }
 
@@ -201,7 +201,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VTypeFun { domain = _ ; codomain = CodDependent _ ; mode = _ } -> true
     (* Refinement types: closure does not escape, so just look at type *)
     | VTypeRefine { typ ; _ } -> contains_mu typ
-    | VTypeAppend items -> List.exists contains_mu items
+    | VTypeAppend items -> List.exists (fun (Any v) -> contains_mu v) items
 
   let default_constructor (variant_t : tval Variant.Label.Map.t) : Variant.Label.t =
     (* Default is a random variant constructor whose payload does not contain a mu type *)
@@ -317,7 +317,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VTypeSingle Any v ->
       Printf.sprintf "(singleton %s)" (to_string v)
     | VTypeAppend items ->
-      Printf.sprintf "append(%s)" (String.concat "," (List.map to_string items))
+      Printf.sprintf "append(%s)" (String.concat "," (List.map (fun (Any v) -> to_string v) items))
 
   and any_to_string (Any any) = to_string any
 

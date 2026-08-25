@@ -62,7 +62,7 @@ let rec is_symbolic : type a. a t -> bool = fun v ->
   | VTypeFun { domain = _ ; codomain = CodDependent _ ; mode = _ }
   | VWrapped { data = _ ; funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } } ->
     true
-  | VTypeAppend items -> List.exists is_symbolic items
+  | VTypeAppend items -> List.exists (fun (Any v) -> is_symbolic v) items
 
 let is_any_symbolic (Any v) = is_symbolic v
 

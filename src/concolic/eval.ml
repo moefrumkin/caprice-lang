@@ -243,8 +243,10 @@ let eval
         ) (return Variant.Label.Map.empty) ls
       in
       return_any (VTypeVariant variant_bodies)
-    | ETypeAppend _ -> 
-      failwith ""
+    | ETypeAppend (e1, e2) -> 
+      let* v1 = eval e1 in
+      let* v2 = eval e2 in
+      eval_append [v1; v2] 
     | EAnyValue -> 
       let* () = incr_step ~max_step in
       let* cell = new_lazy_cell LAny in
@@ -489,6 +491,34 @@ let eval
           value :: eval_onion rest shadowed_labels
         | [] -> []
         in return_any @@ VOnion (eval_onion items [])
+
+  and eval_append
+    : 'env. Val.any list -> (Val.any, 'env) m
+    = fun types -> 
+      let remove_labels labels record_type =
+        List.fold_left (fun acc label -> Record.Label.Map.remove label acc) record_type labels
+      in
+      let rec eval_append (types : any list) (shadowed_labels : Record.Label.t list) : Val.any list =
+        match types with
+        | (Any (VTypeAppend sub_append)) :: rest -> eval_append (sub_append @ rest) shadowed_labels
+        | fst :: (Any (VTypeAppend sub_append)) :: rest -> eval_append (fst :: (sub_append @ rest)) shadowed_labels
+        | (Any (VTypeRecord r1)) :: (Any (VTypeRecord r2)) :: rest ->
+          let merged = Record.Label.Map.union (fun _ a _ -> Some a) r1 r2 |> remove_labels shadowed_labels in
+          let merged_labels = Record.Label.Map.domain merged |> Record.Label.Set.to_list in
+          eval_append (Any (VTypeRecord merged)::rest) (shadowed_labels @ merged_labels)
+        | (Any (VTypeRecord r)) :: rest ->
+          let r = remove_labels shadowed_labels r in
+          let r_labels = Record.Label.Map.domain r |> Record.Label.Set.to_list in
+          (Any (VTypeRecord r)) :: eval_append rest (shadowed_labels @ r_labels)
+        | value :: rest ->
+          value :: eval_append rest shadowed_labels
+        | [] -> []
+      in 
+        match eval_append types [] with
+        | [t] -> return t
+        | types -> return_any @@ VTypeAppend types
+
+
   (*
     -------------------------
     CHECK FOR TYPE REFUTATION
@@ -1172,7 +1202,7 @@ let eval
       | _ ->
         return v
       end
-    | VTypeAppend _ -> failwith "append wrap not implemented"
+    | VTypeAppend _ -> return v (* TODO: this is temporary *)
     | VTypeRefine { var = _ ; typ ; pred = _ } ->
       wrap v typ
 

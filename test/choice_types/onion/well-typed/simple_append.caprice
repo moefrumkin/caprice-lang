@@ -1,0 +1,11 @@
+(* TEST
+  include exhaust;
+*)
+
+let one_d = {x : int}
+let two_d = one_d append {y : int}
+
+let origin : two_d = {x = 0; y = 0}
+
+let make_extend (y : int) : one_d -> two_d =
+    fun x -> x & {y}
