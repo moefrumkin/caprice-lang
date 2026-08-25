@@ -170,7 +170,7 @@ let eval
     | EOnion { left ; right } ->
       let* left = eval left in
       let* right = eval right in
-      return_any (VOnion [ left ; right ])
+      eval_onion [left; right] 
     | EIf { if_ ; then_ ; else_ } ->
       let* v = force_eval if_ in
       begin match v with
@@ -243,7 +243,8 @@ let eval
         ) (return Variant.Label.Map.empty) ls
       in
       return_any (VTypeVariant variant_bodies)
-    | ETypeAppend _ -> failwith "append types not implemented"
+    | ETypeAppend _ -> 
+      failwith ""
     | EAnyValue -> 
       let* () = incr_step ~max_step in
       let* cell = new_lazy_cell LAny in
@@ -471,7 +472,23 @@ let eval
         eval_project v label
       end
     | _ -> mismatch @@ project_non_record v label
-
+  
+  and eval_onion
+    : 'env. Val.any list -> (Val.any, 'env) m
+    = fun items -> 
+      let rec eval_onion (items : Val.any list) (shadowed_labels : Record.Label.t list) : Val.any list =
+        match items with
+        | (Any (VRecord r1)) :: (Any (VRecord r2)) :: rest -> 
+          let merged = Record.Label.Map.union (fun _ a _ -> Some a) r1 r2 in
+          let merged_labels = Record.Label.Map.domain merged |> Record.Label.Set.to_list in
+          eval_onion (Any (VRecord merged)::rest) (shadowed_labels @ merged_labels)
+        | (Any (VRecord r)) as value :: rest ->
+          let labels = Record.Label.Map.domain r |> Record.Label.Set.to_list in
+          value :: eval_onion rest (shadowed_labels @ labels)
+        | value :: rest ->
+          value :: eval_onion rest shadowed_labels
+        | [] -> []
+        in return_any @@ VOnion (eval_onion items [])
   (*
     -------------------------
     CHECK FOR TYPE REFUTATION
@@ -757,6 +774,7 @@ let eval
           ~right:(check v2 t2)
       | _ -> refute
       end
+    | VTypeAppend _ -> failwith "append check not implemented"
     | VTypeSingle v_single ->
       let* v = force_value v in
       handle_two v_single v (function
@@ -953,6 +971,7 @@ let eval
         )
       in
       return_any (VModule genned_body)
+    | VTypeAppend _ -> failwith "append gen not implemented"
     | VTypeSingle v ->
       return v
 
@@ -1153,6 +1172,7 @@ let eval
       | _ ->
         return v
       end
+    | VTypeAppend _ -> failwith "append wrap not implemented"
     | VTypeRefine { var = _ ; typ ; pred = _ } ->
       wrap v typ
 

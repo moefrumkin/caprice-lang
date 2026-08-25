@@ -62,6 +62,7 @@ let rec is_symbolic : type a. a t -> bool = fun v ->
   | VTypeFun { domain = _ ; codomain = CodDependent _ ; mode = _ }
   | VWrapped { data = _ ; funtype = { domain = _ ; codomain = CodDependent _ ; mode = _ } } ->
     true
+  | VTypeAppend items -> List.exists is_symbolic items
 
 let is_any_symbolic (Any v) = is_symbolic v
 
@@ -97,7 +98,8 @@ let rec does_wrap_matter : typ t -> bool = function
   | VTypeMu _ (* we overapproximate and assume the recursive type wrap can matter *)
   | VTypeFun _ (* function wrapper adds usage checks *)
   | VTypeRecord _ (* record and module wrappers can hide labels *)
-  | VTypeModule _ -> true
+  | VTypeModule _
+  | VTypeAppend _ -> true
 
 let is_callable : typ t -> bool = function
   | VTypeFun _ -> true
