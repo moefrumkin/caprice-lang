@@ -9,8 +9,8 @@ let is_nonempty ls =
   | _ -> true
   end
 
-let rec append (type a') (a : list a') (b : list a') : { ls : list a' | is_nonempty ls } =
+let rec append_list (type a') (a : list a') (b : list a') : { ls : list a' | is_nonempty ls } =
   match a with
   | [] -> b (* ERROR: `b` could be empty *)
-  | hd :: tl -> hd :: append a' tl b
+  | hd :: tl -> hd :: append_list a' tl b
   end

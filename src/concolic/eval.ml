@@ -170,7 +170,7 @@ let eval
     | EOnion { left ; right } ->
       let* left = eval left in
       let* right = eval right in
-      return_any (VOnion { left ; right })
+      return_any (VOnion [ left ; right ])
     | EIf { if_ ; then_ ; else_ } ->
       let* v = force_eval if_ in
       begin match v with
@@ -243,6 +243,7 @@ let eval
         ) (return Variant.Label.Map.empty) ls
       in
       return_any (VTypeVariant variant_bodies)
+    | ETypeAppend _ -> failwith "append types not implemented"
     | EAnyValue -> 
       let* () = incr_step ~max_step in
       let* cell = new_lazy_cell LAny in
@@ -450,8 +451,8 @@ let eval
       | Some v' -> return v'
       | None -> mismatch @@ missing_label v label
       end
-    | Any (VOnion {left ; right}) ->
-      chain (eval_project left label) (eval_project right label)
+    | Any (VOnion items) ->
+      List.fold_left (fun acc x -> chain acc (eval_project x label)) (mismatch @@ missing_label v label) items
     | Any (VLazy ({ cell; _ } as typed_cell)) ->
       let* lazy_v = get_cell cell in
       begin match lazy_v with
@@ -462,7 +463,7 @@ let eval
         let* () = incr_step ~max_step in
         let* onion_cell = new_lazy_cell LAny in
         let record = VRecord ( Record.Label.Map.of_list [(label, to_any field_cell)]) in
-        let onioned_record = VOnion { left=to_any record; right=to_any onion_cell} |> to_any in
+        let onioned_record = VOnion [ to_any record; to_any onion_cell] |> to_any in
         let* () = set_cell cell (LValue onioned_record) in
         return_any field_cell
       | LLazy _ ->
@@ -881,7 +882,7 @@ let eval
       in
       let* () = assert_inputs_allowed in
       let* l = new_lazy_cell (LAny) in
-      return_any (VOnion { left=Any (VRecord genned_body) ; right = Any l })
+      return_any (VOnion [ Any (VRecord genned_body) ; Any l ])
     | VTypeVariant variant_t ->
       let t_labels = Variant.Label.B.domain variant_t in
       let* l =

@@ -10,7 +10,7 @@ let cons (type a) (x : a) (dl : t a) : t a =
   fun l ->
     x :: dl l
 
-let append (type a) (dl1 : t a) (dl2 : t a) : t a =
+let append_list (type a) (dl1 : t a) (dl2 : t a) : t a =
   fun l ->
     dl1 (dl2 l)
 

@@ -8,15 +8,15 @@ let any_type a = mu t.
   | `L of list t
   | `A of a
 
-let rec append a b =
+let rec append_list a b =
   match a with
   | [] -> b
-  | hd :: tl -> hd :: append tl b
+  | hd :: tl -> hd :: append_list tl b
   end
 
 let rec flatten (type a') (x : any_type a') : list a' =
   match x with
   | `L [] -> []
-  | `L (hd :: tl) -> append (flatten a' hd) tl (* ERROR: should have `(flatten (`L tl))` instead of `tl` *)
+  | `L (hd :: tl) -> append_list (flatten a' hd) tl (* ERROR: should have `(flatten (`L tl))` instead of `tl` *)
   | `A a -> [ a ]
   end

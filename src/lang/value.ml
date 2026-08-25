@@ -33,7 +33,7 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VGenPoly : { id : int ; nonce : int } -> dat t
     | VLazy : lazy_cell -> dat t (* lazily evaluated thing, so state must manage this *)
     (* wrapped values *)
-    | VOnion : { left : any ; right : any } -> dat t
+    | VOnion : any list -> dat t
     | VWrapped : { data : dat t ; funtype : (typ t, fun_cod) Funtype.t } -> dat t
     (* type values only *)
     | VType : typ t
@@ -169,8 +169,8 @@ module Make (Atom_cell : Utils.Types.P1) = struct
     | VModule map_body
     | VRecord map_body ->
       Record.Label.Map.exists (fun _ (Any v') -> contains_mu v') map_body
-    | VOnion { left=Any left ; right=Any right } ->
-      contains_mu left || contains_mu right
+    | VOnion items ->
+      List.exists (fun (Any v) -> contains_mu v) items 
     | VTuple (Any v1, Any v2) ->
       contains_mu v1 || contains_mu v2
     | VListCons { hd = Any v_hd ; tl } ->
@@ -250,8 +250,8 @@ module Make (Atom_cell : Utils.Types.P1) = struct
       Printf.sprintf "G(%s)" (to_string (VTypeFun funtype))
     | VGenPoly { id ; nonce } ->
       Printf.sprintf "G(poly id : %d, nonce : %d)" id nonce
-    | VOnion { left=Any left ; right=Any right } ->
-      Printf.sprintf "Onioned(%s, %s)" (to_string left) (to_string right)
+    | VOnion items ->
+      Printf.sprintf "Onioned(%s)" (String.concat ", " (List.map (fun (Any v) -> to_string v) items))
     | VWrapped { data ; funtype } ->
       Printf.sprintf "W(%s, %s)" (to_string data) (to_string (VTypeFun funtype))
     | VLazy { cell = _ ; wrapping_types } ->
