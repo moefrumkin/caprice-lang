@@ -244,9 +244,10 @@ let eval
       in
       return_any (VTypeVariant variant_bodies)
     | ETypeAppend (e1, e2) -> 
-      let* v1 = eval e1 in
-      let* v2 = eval e2 in
-      eval_append [v1; v2] 
+      let* v1 = eval_type e1 in
+      let* v2 = eval_type e2 in
+      let* append_type = eval_append [v1; v2]  in
+      return_any append_type
     | EAnyValue -> 
       let* () = incr_step ~max_step in
       let* cell = new_lazy_cell LAny in
@@ -480,6 +481,8 @@ let eval
     = fun items -> 
       let rec eval_onion (items : Val.any list) (shadowed_labels : Record.Label.t list) : Val.any list =
         match items with
+        | (Any (VOnion sub_onion)) :: rest -> eval_onion (sub_onion @ rest) shadowed_labels
+        | fst :: (Any (VOnion sub_onion)) :: rest -> eval_onion (fst :: (sub_onion @ rest)) shadowed_labels
         | (Any (VRecord r1)) :: (Any (VRecord r2)) :: rest -> 
           let merged = Record.Label.Map.union (fun _ a _ -> Some a) r1 r2 in
           let merged_labels = Record.Label.Map.domain merged |> Record.Label.Set.to_list in
@@ -490,33 +493,33 @@ let eval
         | value :: rest ->
           value :: eval_onion rest shadowed_labels
         | [] -> []
-        in return_any @@ VOnion (eval_onion items [])
+      in return_any @@ VOnion (eval_onion items [])
 
   and eval_append
-    : 'env. Val.any list -> (Val.any, 'env) m
+    : 'env. Val.tval list -> (Val.tval, 'env) m
     = fun types -> 
       let remove_labels labels record_type =
         List.fold_left (fun acc label -> Record.Label.Map.remove label acc) record_type labels
       in
-      let rec eval_append (types : any list) (shadowed_labels : Record.Label.t list) : Val.any list =
+      let rec eval_append (types : tval list) (shadowed_labels : Record.Label.t list) : tval list =
         match types with
-        | (Any (VTypeAppend sub_append)) :: rest -> eval_append (sub_append @ rest) shadowed_labels
-        | fst :: (Any (VTypeAppend sub_append)) :: rest -> eval_append (fst :: (sub_append @ rest)) shadowed_labels
-        | (Any (VTypeRecord r1)) :: (Any (VTypeRecord r2)) :: rest ->
+        | ( (VTypeAppend sub_append)) :: rest -> eval_append (sub_append @ rest) shadowed_labels
+        | fst :: ( (VTypeAppend sub_append)) :: rest -> eval_append (fst :: (sub_append @ rest)) shadowed_labels
+        | ( (VTypeRecord r1)) :: ( (VTypeRecord r2)) :: rest ->
           let merged = Record.Label.Map.union (fun _ a _ -> Some a) r1 r2 |> remove_labels shadowed_labels in
-          let merged_labels = Record.Label.Map.domain merged |> Record.Label.Set.to_list in
-          eval_append (Any (VTypeRecord merged)::rest) (shadowed_labels @ merged_labels)
-        | (Any (VTypeRecord r)) :: rest ->
+          (* let merged_labels = Record.Label.Map.domain merged |> Record.Label.Set.to_list in *)
+          eval_append ( (VTypeRecord merged)::rest) (shadowed_labels )
+        | ( (VTypeRecord r)) :: rest ->
           let r = remove_labels shadowed_labels r in
           let r_labels = Record.Label.Map.domain r |> Record.Label.Set.to_list in
-          (Any (VTypeRecord r)) :: eval_append rest (shadowed_labels @ r_labels)
+          ( (VTypeRecord r)) :: eval_append rest (shadowed_labels @ r_labels)
         | value :: rest ->
           value :: eval_append rest shadowed_labels
         | [] -> []
       in 
         match eval_append types [] with
         | [t] -> return t
-        | types -> return_any @@ VTypeAppend types
+        | types -> return @@ VTypeAppend types
 
 
   (*
@@ -886,14 +889,12 @@ let eval
         check genned t2
   
   and check_append
-    : 'a 'env. any list -> any list -> ('a, 'env) m
+    : 'a 'env. any list -> tval list -> ('a, 'env) m
     = fun items types ->
       match items, types with
       | item::item_rest, type_::type_rest ->
-        Val.handle_any ~typ:(fun type_ ->
         let* _ = check item type_
         in check_append item_rest type_rest
-        ) ~dat:(fun _ -> escape (Refutation (Any (VOnion items), (VTypeAppend types)))) type_
       | _ -> escape (Refutation (Any (VOnion items), (VTypeAppend types)))
   
   (*
@@ -1018,14 +1019,13 @@ let eval
       in
       return_any (VModule genned_body)
     | VTypeAppend types -> 
-      let* items = List.fold_left (fun acc x -> 
-          Monad.bind acc (fun acc -> 
-              Val.handle_any ~typ:(fun t -> 
-                let* x = gen t in
-                return (acc @ [x])
-              ) ~dat:(fun _ -> failwith "") x
-            )
-        ) (return []) types in 
+      let* items =
+        List.fold_left (fun acc t -> 
+          let* acc in
+          let* v = gen t in
+          return (acc @ [v])
+          ) (return []) types 
+      in 
       return_any (VOnion items)
     | VTypeSingle v ->
       return v

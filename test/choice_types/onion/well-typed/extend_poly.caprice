@@ -1,0 +1,9 @@
+(* TEST
+  include exhaust;
+*)
+
+let two_d = {x : int ; y : int}
+let three_d = two_d append {z : int}
+
+let make_extend (type a) (z : int) (pt : two_d append a): (three_d append a) =
+  {z} & pt

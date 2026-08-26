@@ -1,0 +1,6 @@
+(* TEST
+    include refute;
+*)
+
+let access (type a) (pt : a append {x : int}) : int =
+    a.x
