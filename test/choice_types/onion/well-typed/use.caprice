@@ -1,0 +1,10 @@
+(* TEST
+    include exhaust;
+*)
+
+let f (type t1 t3) (r1 : t1) (r2 : {a : int}) (r3 : t3) : t1 append {a : int} append t3 =
+    r1 & r2 & r3
+
+let use : {a : int ; b : int ; c : int} = f {b : int} {c : int} {b = 0} { a = 0 } { c = 0}
+
+let a : int = use.a
