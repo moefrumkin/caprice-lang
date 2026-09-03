@@ -480,18 +480,24 @@ let eval
     : 'env. Val.any list -> (Val.any, 'env) m
     = fun items -> 
       let rec eval_onion (items : Val.any list): Val.any list =
-        match items with
+        begin match items with
         | (Any (VOnion sub_onion)) :: rest -> eval_onion (sub_onion @ rest)
         | fst :: (Any (VOnion sub_onion)) :: rest -> eval_onion (fst :: (sub_onion @ rest))
         | (Any (VRecord r1)) :: (Any (VRecord r2)) :: rest -> 
           let merged = Record.Label.Map.union (fun _ a _ -> Some a) r1 r2 in
           eval_onion (Any (VRecord merged)::rest)
+        | (Any (VRecord r)) :: rest when Record.Label.Map.is_empty r ->
+          eval_onion rest
         | (Any (VRecord _)) as value :: rest ->
           value :: eval_onion rest 
         | value :: rest ->
           value :: eval_onion rest 
+
         | [] -> []
-      in return_any @@ VOnion (eval_onion items)
+        end
+      in match eval_onion items with
+      | [item] -> return item
+      | items -> return_any @@ VOnion items
 
   and eval_append
     : 'env. Val.tval list -> (Val.tval, 'env) m
@@ -507,6 +513,8 @@ let eval
           let merged = Record.Label.Map.union (fun _ a _ -> Some a) r1 r2 |> remove_labels shadowed_labels in
           (* let merged_labels = Record.Label.Map.domain merged |> Record.Label.Set.to_list in *)
           eval_append ( (VTypeRecord merged)::rest) (shadowed_labels )
+        | ( (VTypeRecord r)) :: rest when Record.Label.Map.is_empty r ->
+          (eval_append rest shadowed_labels)
         | ( (VTypeRecord r)) :: rest ->
           let r = remove_labels shadowed_labels r in
           let r_labels = Record.Label.Map.domain r |> Record.Label.Set.to_list in
@@ -1022,7 +1030,7 @@ let eval
           let* acc in
           let* v = gen t in
           return (acc @ [v])
-          ) (return []) types 
+          ) (return []) types (* TODO: onion any to end *)
       in 
       return_any (VOnion items)
     | VTypeSingle v ->

@@ -1,0 +1,4 @@
+let append_ (type a b) (x : a) (y : b) : a append b =
+    x & y
+
+let id (type a) (x : a) : a = append_ {:} a {} x
