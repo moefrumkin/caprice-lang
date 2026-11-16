@@ -1,0 +1,6 @@
+(*  TEST
+    include refute;
+*)
+
+let append_ (type a b c) (x : a) (y : b) (z : c) : a append c =
+    x & y & z

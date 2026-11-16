@@ -3,4 +3,4 @@
 *)
 
 let f (type a) (x : (a append {z : bool})) : a append {z : int} =
-  x  (* this is bad *)
+  x
