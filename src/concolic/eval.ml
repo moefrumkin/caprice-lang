@@ -961,9 +961,7 @@ let eval
       let* genned_body =
         Record.Label.Map.mapM (module Semantics) gen record_t
       in
-      let* () = assert_inputs_allowed in
-      let* l = new_lazy_cell (LAny) in
-      return_any (VOnion [ Any (VRecord genned_body) ; Any l ])
+      return_any (VRecord genned_body)
     | VTypeVariant variant_t ->
       let t_labels = Variant.Label.B.domain variant_t in
       let* l =

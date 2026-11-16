@@ -5,5 +5,5 @@
 let two_d = {x : int ; y : int}
 let three_d = two_d append {z : int}
 
-let make_extend (z : int) : two_d -> three_d =
-    fun pt -> {z} & pt
+let make_extend (z : int) (pt : two_d): three_d =
+  pt & {z}

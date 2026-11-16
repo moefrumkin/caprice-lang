@@ -5,4 +5,5 @@
 let twoD = { x : int ; y : int }
 let threeD = { x : int ; y : int ; z : int }
 
-let twoD_to_threeD (pt : twoD) : threeD = {z = 0} & pt
+(* pt may already have a field z *)
+let twoD_to_threeD (pt : twoD) : threeD = pt & {z = 0}
