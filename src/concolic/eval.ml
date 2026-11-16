@@ -899,9 +899,19 @@ let eval
     = fun items types ->
       match items, types with
       | item::item_rest, type_::type_rest ->
-        let* _ = check item type_
-        in check_append item_rest type_rest
-      | _ -> escape (Refutation (Any (VOnion items), (VTypeAppend types)))
+        let* () = incr_step ~max_step in
+        let* l = read_and_log_input KTag ~default:(Left CheckAppendType) in
+        begin match l with
+          | Left CheckAppendType ->
+            let* () = push_tag_to_path (Left CheckAppendType) ~alternatives:([(Right CheckAppendType)]) in
+            check item type_
+          | Right CheckAppendType ->
+            let* () = push_tag_to_path (Right CheckAppendType) ~alternatives:([(Left CheckAppendType)]) in
+            check_append item_rest type_rest
+          | _ -> raise bad_input_env
+        end
+      | [], types when not (List.is_empty types) -> escape (Refutation (Any (VOnion items), (VTypeAppend types)))
+      | _, _ -> escape Confirmation
   
   (*
     -------------------------
@@ -1026,9 +1036,17 @@ let eval
       return_any (VModule genned_body)
     | VTypeAppend types -> 
       let* items =
+        let gen_item t = 
+          begin match t with
+          | VTypeRecord record_t ->
+            let* genned_body = Record.Label.Map.mapM (module Semantics) gen record_t in
+            return_any (VRecord genned_body)
+          | t -> gen t
+          end
+        in
         List.fold_left (fun acc t -> 
           let* acc in
-          let* v = gen t in
+          let* v = gen_item t in
           return (acc @ [v])
           ) (return []) types (* TODO: onion any to end *)
       in 

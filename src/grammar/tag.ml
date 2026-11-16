@@ -13,6 +13,7 @@ type reason =
   | GenInt
   | GenBool
   | GenClosure
+  | CheckAppendType
 
 let reason_to_string = function
   | GenList             -> "Generate list"
@@ -28,6 +29,7 @@ let reason_to_string = function
   | GenInt              -> "Generate Int"
   | GenBool             -> "Generate Bool"
   | GenClosure          -> "Generate Closure"
+  | CheckAppendType         -> "Check append type"
 
 type dir =
   | Gen   (* the label is used to generate something *)
