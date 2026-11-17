@@ -1046,7 +1046,7 @@ let eval
           let* acc in
           let* v = gen_item t in
           return (acc @ [v])
-          ) (return []) types (* TODO: onion any to end *)
+          ) (return []) types
       in 
       return_any (VOnion items)
     | VTypeSingle v ->
