@@ -1,0 +1,10 @@
+(* TEST
+    include exhaust;
+*)
+
+let twoD = { x : int ; y : int }
+let threeD = { x : int ; y : int ; z : int }
+
+let threeD_origin : threeD = {x = 0; y = 0; z = 0}
+
+let twoD_origin : twoD = threeD_origin
