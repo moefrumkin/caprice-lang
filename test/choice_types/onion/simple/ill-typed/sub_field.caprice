@@ -1,0 +1,6 @@
+(* TEST
+    include refute;
+*)
+
+let f (type a) (z : a): {x : int; y: {z : ({w : int} append a)}} =
+    {x = 0; y = {z = z & {w = 0}}}

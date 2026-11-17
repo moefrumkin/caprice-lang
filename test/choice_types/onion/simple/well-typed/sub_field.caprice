@@ -1,0 +1,6 @@
+(* TEST
+    include exhaust;
+*)
+
+let f (type a) (z : a): {x : int; y: {z : ({w : int} append a)}} =
+    {x = 0; y = {z = {w = 0} & z}}

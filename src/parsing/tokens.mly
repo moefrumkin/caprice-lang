@@ -73,4 +73,6 @@
 
 %token APPEND
 
+%token ANY_REC
+
 %%
