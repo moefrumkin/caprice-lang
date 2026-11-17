@@ -1,0 +1,10 @@
+(* TEST
+    include refute;
+*)
+
+let twoD = { x : int ; y : int }
+let threeD = { x : int ; y : int ; z : int }
+
+let twoD_origin : twoD = { x = 0; y = 0; z = 0 }
+
+let threeD_origin : threeD = twoD_origin
